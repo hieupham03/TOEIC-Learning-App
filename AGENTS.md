@@ -1,33 +1,31 @@
-# Active, separate validation authority — Synthetic Android Emulator UI Check
+# AGENTS.md — TOEIC Learning App / Codex (current branch authority)
 
-**PO chat-authorized** after Beta closure: a **single local Android Emulator UI engineering smoke-check**, strictly on **synthetic Part 5–7 fixtures**, described in `docs/STAGE05_SYNTHETIC_ANDROID_EMULATOR_UI_CHECK_AUTHORIZATION_V0.1.md`. Use branch `validation/android-ui-synthetic` and work packages **EUI-01..03**. Previous Alpha/Beta "no emulator" limitations are superseded **only for this bounded local emulator smoke check**; *real phones, learner tests, formal ECP/QA, pilot and release remain forbidden*. Do not introduce actual B1, media, backend, accounts, persistence, durable ACK, authoritative time, ARCH03, unapproved CX tasks, cost, or edit signed baseline bytes. Stop if zero-cost/local emulator is unavailable. Keep screenshots and APK local; repository is currently public. Provide a truthful text report and commit only permitted small UI fixes/tests/docs. No formal accessibility, QA or device PASS claims.
+## Active PO decision — 2026-11-21
 
----
+**D05-CX04-013=A is APPROVED BY PRODUCT OWNER**, scoped to **Development CX-04 synthetic Listening foundation only**: `CX04-L01..L03` plus **one local Android Emulator engineering smoke check**. The exact binding approval is `docs/STAGE05_D05_CX04_013_A_APPROVAL_RECORD_V1.0.md`; the detailed scope is `docs/STAGE05_D05_CX04_013_LISTENING_DEVELOPMENT_DECISION_PROPOSAL_V0.1.md`; the executable instructions are `codex_handoff/CX04_SYNTHETIC_LISTENING_AUTHORIZED_EXECUTION_V0.1.md`. **Read these before changing code.**
 
-# Active Development Beta (PO chat-confirmed, bounded)
+**Work exclusively on:** `development/cx04-listening-synthetic`. Source baseline: completed EUI engineering commit `52e0af4a051edb5832262a0720f1dd486012a4f5` (no QA PASS). Do not rewrite old branches. Preserve any local user changes safely.
 
-Read `docs/STAGE05_DEVELOPMENT_BETA_READING_UI_PO_AUTHORIZATION_V0.1.md` **before any coding**. The PO approved bounded *synthetic Reading UI development only* following Alpha Closure V0.3. Scope IDs: **BUI-01 / BUI-02 / BUI-03**, **NOT CX-04** (CX-04 remains Listening/media and is NOT authorized). Work on `development/beta-reading-ui` only. Permitted: synthetic Compose Reading UI/layout, source-level accessibility hardening, tests, Gradle build, optional local Compose Preview (engineering observations only). Not permitted: device/emulator/learner tests, formal ECP/QA, backend/API, persistence/ACK, clock, real B1/Full Mock, media, other CX-04+, costs, or signed baseline edits. Do not claim a QA PASS. Continue to obey all former G05-CP and baseline restrictions. Previous Alpha-only stop rule below is historical for the Alpha branch and is superseded **only for the narrowly authorized BUI-01..03** on this Beta branch.
+The original `D05-DEV-GATE-012=A` remains Stage05 **CONDITIONAL PASS FOR DEVELOPMENT TRANSITION ONLY**. G05-CP01..08 plus all other Stage02/03/04 CPs ACTIVE, POL01..16 OPEN, budget DEFERRED. Existing Vision V1.0 / PRD-SRS V0.6 / Acceptance V0.4 / Design V0.3 / UI-G01..16 **controlled baseline bytes immutable**.
 
----
+## The ONLY newly permitted behavior
 
-# AGENTS.md — TOEIC Learning App / Codex instructions (latest)
+- **CX04-L01:** Distinct synthetic-only Listening **DEMO/LAB** flow for Parts 1–4 with fake group/item data and visibly labelled unapproved audio/content; real Part1–4 bank stays `NOT_QA_READY`. Do not unlock Full Mock.
+- **CX04-L02:** Bundled original **programmatically generated WAV tones** (NOT English speech/TOEIC), one group per Part 1–4; versioned and hash-attributed mapping `part/group/item/audio/order`; local demo play/pause/stop/replay/error states. No streaming/cloud services.
+- **CX04-L03:** Fail-closed tests for missing/mismatched/duplicate/out-of-order assets, existing Reading/Part5 regressions, source guards, Kotlin smoke, Gradle build/unit tests, actual command exit codes, safety report.
+- **Exactly one** local Android Emulator engineering smoke check of the synthetic audio flow; not a real phone, learner, ECP, QA or official media-integrity proof.
+- Reversible implementation details may be decided autonomously. No per-file microapproval requests.
 
-## Current signed authority
+## Explicit STOP / still prohibited
 
-PO **D05-DEV-GATE-012=A APPROVED** Stage05 Gate CONDITIONAL PASS *FOR DEVELOPMENT TRANSITION ONLY*, G05-CP01..08 **ACTIVE**, Alpha **CX-00..03 authorized** for Kotlin + Jetpack Compose, synthetic practice/Reading UI and internal engineering build/unit tests. See `docs/STAGE05_D05_DEV_GATE_012_A_APPROVAL_RECORD_V1.0.md`. Previous V6.7 handoff `PENDING` headings are historical and superseded, not permission for CX04+.
+No real or unverified B1/ETS Listening audio/questions, no speech/TTS or licensed/downloaded assets without separate provenance authority, no real Full Mock A/B or official scoring, no clean/comparable attempt or time/replay integrity system. Do not implement `CX05..CX09`, cloud/backend/API/remote DB, authentication, real data, app persistence/durable ACK, authoritative timer, ARCH03 A/B/C selection, ARCH04, PDF/book/audio import, real device, learner tests, QA-01..08, ECP-00..06, pilot, Play Store release, new vendor/paid tooling/spending, or any signed baseline change. Two real B1 200Q forms remain inventoried but not QA cleared.
 
-## First reads
+**Traceability:** FR-003 / AT-03 are bounded design/engineering links, NOT formal PASS. FR-011 / AT-11 are boundaries only and not implemented. DEMO replay must NOT leak into Full Mock.
 
-Read `docs/PROJECT_STATE.md` first current top block, `codex_handoff/ALPHA_CX00_CX03_AUTHORIZED_CONTINUATION_V0.1.md`, signed PRD/SRS/Acceptance/Design V0.3 and UI-G01..16. **Never edit approved baseline bytes.**
+## Required evidence and handoff
 
-## What can be done without another PO question
+Check the safe branch, compile Android, run existing Alpha/Beta checks and newly added Listening negative-unit checks, and run the one permitted local Android Emulator check when available. Distinguish **PASS / FAIL / BLOCKED / NOT RUN**; do not invent screenshots or auditory observations. Leave APK, emulator screenshots, raw logs and credentials local; repo is **PUBLIC**. Commit only in-scope code, safe synthetic tone fixtures, tests and `docs/STAGE05_CX04_SYNTHETIC_LISTENING_ENGINEERING_REPORT_V0.1.md`. Include changed paths, fixture hashes, actual toolchain/output and remaining evidence gaps. Stop after CX04-L01..03 and the one emulator check.
 
-Within CX00..03, fix Android compile/build tooling, UI layout, synthetic Part selection/Part5 practice/Part6–7 Reading, unit tests and in-scope local engineering checks. Report evidence honestly; do not claim Android build PASS unless actually executed. Kotlin/Compose is only a scoped Alpha client technology choice.
+## Historical authority and preserved engineering work
 
-## Explicit stop conditions
-
-**NO** CX04+, actual media/Full Mock B1, real account/data, production storage/ACK, remote API/backend/DB/authentication, clock authority, ARCH03 A/B/C trust choice, ARCH04, formal ECP/QA, real-device/learner testing or spending. All POL01..16 concrete decisions remain OPEN. B1 two independent PO-inventoried 200Q mocks mandatory but unverified; do not copy real content or claim ETS equivalence. P05–P08 documentary rule subsets only. Budget remains DEFERRED.
-
-## Required progress report
-
-List file paths changed, FR/AT links, commands and actual PASS/FAIL/NOT RUN, usability/technical risks, then next **material** PO decision only if needed. No repetitive micro-approvals.
+Alpha CX-00..03 approved in `docs/STAGE05_D05_DEV_GATE_012_A_APPROVAL_RECORD_V1.0.md`, Beta BUI-01..03 authorized under `docs/STAGE05_DEVELOPMENT_BETA_READING_UI_PO_AUTHORIZATION_V0.1.md`, EUI-01..03 under `docs/STAGE05_SYNTHETIC_ANDROID_EMULATOR_UI_CHECK_AUTHORIZATION_V0.1.md`. Their historical "NO CX04" constraints are superseded **only** by the current explicitly scoped `D05-CX04-013=A`. No old documentary PENDING label overrides the new signed-in-chat PO decision. All other controls remain in force.
