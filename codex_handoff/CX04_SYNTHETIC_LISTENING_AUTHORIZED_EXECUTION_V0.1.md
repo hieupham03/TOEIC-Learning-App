@@ -1,0 +1,22 @@
+# Codex Handoff — Authorized CX-04 Synthetic Listening, 2026-11-21
+
+**Status: EXECUTION AUTHORIZED, BOUNDED.** Authority: `docs/STAGE05_D05_CX04_013_A_APPROVAL_RECORD_V1.0.md`, PO `D05-CX04-013=A`. Specification: `docs/STAGE05_D05_CX04_013_LISTENING_DEVELOPMENT_DECISION_PROPOSAL_V0.1.md`. Read `AGENTS.md` first and keep all STOP rules. **Branch:** `development/cx04-listening-synthetic`. Base: Android Emulator engineering commit `52e0af4`. Do not change the approval record, the signed baselines or older branch histories.
+
+## Execution sequence (autonomous within scope)
+
+1. **Initial safety check.** Verify correct branch, clean or preserved user working tree, current HEAD and JDK17/SDK36/Gradle8.13 local environment. Check manifest has no INTERNET permission. Report any unexpected uncommitted changes; never discard user work. Read baseline requirements FR-003/AT-03 and the Full Mock exclusion around FR-011/AT-11.
+2. **CX04-L01 — Listening DEMO entry.** Add **separate DEMO-only** Part 1–4 navigation from current Part picker/Task Hub without changing `ContentReadiness.NOT_QA_READY` or existing `canStartAlphaPart(1..4)==false`. Clearly say `DEMO · âm thanh thử nghiệm · không phải bài nghe TOEIC · chưa QA`. A Part 1 synthetic photo placeholder may be code-drawn or text placeholder; do not ingest copyrighted images. Keep Full Mock A/B blocked.
+3. **CX04-L02 — local audio.** Write a deterministic minimal standard-library WAV generator for self-authored tones (e.g. distinct frequencies, short durations, low volume); generate one bundled local fixture per Part 1–4. Use a reversible local Android media playback API and explicit fixture metadata `partId/groupId/itemId/audioId/order/version/hash`. Model controls and audio errors (idle/loading/playing/paused/completed/invalid/missing), and local play/pause/stop/replay for DEMO practice. Avoid recording, background service, network playback, actual English speech, external audio libraries/services and paid tools. Avoid fake sample questions claimed educational/QA-ready.
+4. **CX04-L03 — fail-closed checks.** Add deterministic unit tests proving missing file/group, mismatched/duplicate IDs and invalid order are rejected rather than playing wrong media, and that Full Mock stays unavailable. Ensure Parts 5–7 unchanged. Update scoped guards to distinguish **blocked real bank** from **distinct DEMO Listening route**. Preserve Alpha/Beta checks; if a static guard's wording becomes stale, update only its accurate wording without weakening safety.
+5. **Local engineering verification.** From `android-app`, run `python scripts/check_alpha_scope.py`, `python scripts/check_beta_reading_ui_scope.py`, PowerShell `scripts/run_pure_kotlin_core_checks.ps1` with explicit KotlinHome/JavaHome as needed, `.\gradlew.bat --offline --no-daemon --console=plain :app:assembleDebug :app:testDebugUnitTest --rerun`, and any new Listening test command. Record actual exit codes. Use one already installed Android Emulator AVD only for a bounded synthetic DEMO playback check: group selection, control states, file missing/error, back navigation, and Part 5–7 regression. If no reliable audio output is observable, explicitly state playback quality/audibility NOT VERIFIED. No phone or learner tests.
+6. **Report and commit.** Write `docs/STAGE05_CX04_SYNTHETIC_LISTENING_ENGINEERING_REPORT_V0.1.md` with complete changed paths; trace FR-003/AT-03 as bounded engineering *targets*, FR-011/AT-11 as *out-of-scope constraints*, fixtures provenance and SHA-256; actual PASS/FAIL/BLOCKED/NOT RUN; emulator context; failures, regressions and proof gaps. Commit/push to this branch only. Generated APK, raw logs, local emulator screenshots and secrets must stay local because repo is public. Include commit SHA and stop.
+
+## Important semantics
+
+- In main part bank **Listening Parts 1–4 remain NOT_QA_READY**; DEMO is a clearly separate transport experiment.
+- WAV tones are NOT speech, TOEIC listening content or quality-approved media. Do not infer instruction-based content learning success from media playback.
+- Replay/pause are allowed only for DEMO practice, not for Full Mock.
+- No durable ACK, clock authority, scored full attempts, real B1, official time, official score, remote services, paid assets, architecture selection, formal QA/ECP, real Android device or user testing.
+- If work would require any forbidden dependency, choose BLOCKED and explain rather than silently expand.
+
+**Done means bounded engineering implementation + truthful evidence, never a formal product QA PASS.**
