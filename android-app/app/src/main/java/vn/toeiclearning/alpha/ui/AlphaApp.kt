@@ -393,8 +393,12 @@ private fun ReadingScreen(part: Int, onBack: () -> Unit) {
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val readingGutter = if (maxWidth < 400.dp) 16.dp else contentPadding
+        // Cap the incoming width before filling the remaining space.
         Column(
-            modifier = Modifier.fillMaxSize().widthIn(max = 720.dp).align(Alignment.TopCenter),
+            modifier = Modifier
+                .widthIn(max = 720.dp)
+                .fillMaxSize()
+                .align(Alignment.TopCenter),
         ) {
             Column(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = readingGutter, vertical = 8.dp),
