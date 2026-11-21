@@ -1,0 +1,26 @@
+# Android / Gradle local state and generated outputs
+.gradle/
+**/.gradle/
+**/build/
+**/local.properties
+android-app/.tooling/
+android-app/.kotlin/
+
+# Local SDK, IDE and operating-system state
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Credentials, signing material and local environment files
+.env
+.env.*
+!.env.example
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+key.properties
+google-services.json
