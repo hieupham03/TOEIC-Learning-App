@@ -100,3 +100,21 @@ data class ReadingContext(
         return copy(itemIndex = index, itemOffset = offset)
     }
 }
+
+/** In-memory Reading navigation only; it is not lifecycle recovery or durable progress. */
+enum class ReadingPane { PASSAGE, QUESTIONS }
+
+data class ReadingSession(
+    val pane: ReadingPane,
+    val context: ReadingContext,
+) {
+    fun openQuestions(itemIndex: Int, itemOffset: Int): ReadingSession = copy(
+        pane = ReadingPane.QUESTIONS,
+        context = context.withPassageAnchor(itemIndex, itemOffset),
+    )
+
+    fun returnToPassage(): ReadingSession = copy(pane = ReadingPane.PASSAGE)
+
+    fun selectQuestion(question: SyntheticQuestion): ReadingSession =
+        copy(context = context.withQuestion(question))
+}

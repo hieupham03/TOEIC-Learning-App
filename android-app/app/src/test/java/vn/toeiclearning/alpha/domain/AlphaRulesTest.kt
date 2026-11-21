@@ -33,4 +33,21 @@ class AlphaRulesTest {
         assertEquals(40, next.itemOffset)
         assertEquals(qs.last().id, next.questionId)
     }
+
+    @Test fun readingSessionReturnsToCapturedPassageAnchor() {
+        val questions = SyntheticCatalogue.questions(7)
+        val original = ReadingSession(
+            ReadingPane.PASSAGE,
+            ReadingContext("DEMO-P7-TEXT", questions.first().id),
+        )
+
+        val questionPane = original.openQuestions(itemIndex = 5, itemOffset = 40)
+            .selectQuestion(questions.last())
+        val returned = questionPane.returnToPassage()
+
+        assertEquals(ReadingPane.PASSAGE, returned.pane)
+        assertEquals(5, returned.context.itemIndex)
+        assertEquals(40, returned.context.itemOffset)
+        assertEquals(questions.last().id, returned.context.questionId)
+    }
 }

@@ -3,8 +3,10 @@ package vn.toeiclearning.alpha.ui
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,8 +16,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -31,6 +36,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -41,18 +47,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import vn.toeiclearning.alpha.domain.PracticeRules
 import vn.toeiclearning.alpha.domain.PracticeState
 import vn.toeiclearning.alpha.domain.ReadingContext
+import vn.toeiclearning.alpha.domain.ReadingPane
+import vn.toeiclearning.alpha.domain.ReadingSession
 import vn.toeiclearning.alpha.domain.SyntheticCatalogue
 import vn.toeiclearning.alpha.domain.SyntheticQuestion
 
 private enum class AlphaRoute { HOME, PARTS, PRACTICE, READING, MOCK_INFO, PROGRESS, PROFILE }
 private enum class AlphaTab(val title: String) { START("Bắt đầu"), PROGRESS("Tiến độ"), PROFILE("Cá nhân") }
-private enum class ReadingPane { PASSAGE, QUESTIONS }
 private val contentPadding = 20.dp
 
 @Composable
@@ -320,7 +329,12 @@ private fun QuestionPanel(
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth()
-                        .clickable(enabled = feedback == null) { onSelect(index) }
+                        .selectable(
+                            selected = selection == index,
+                            enabled = feedback == null,
+                            role = Role.RadioButton,
+                            onClick = { onSelect(index) },
+                        )
                         .semantics { contentDescription = "Đáp án ${('A' + index)}: $choice" }
                         .padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -328,6 +342,7 @@ private fun QuestionPanel(
                     RadioButton(
                         selected = selection == index,
                         onClick = null, // Entire labelled answer row is the single action target.
+                        modifier = Modifier.clearAndSetSemantics { },
                     )
                     Spacer(Modifier.width(10.dp))
                     Text("${'A' + index}. $choice", style = MaterialTheme.typography.bodyLarge)
@@ -360,93 +375,115 @@ private fun ReadingScreen(part: Int, onBack: () -> Unit) {
         return
     }
 
-    var pane by rememberSaveable(part) { mutableStateOf(ReadingPane.PASSAGE) }
-    var context by remember(part) { mutableStateOf(ReadingContext(passage.id, questions.first().id)) }
+    var session by remember(part) {
+        mutableStateOf(ReadingSession(ReadingPane.PASSAGE, ReadingContext(passage.id, questions.first().id)))
+    }
     var answers by remember(part) { mutableStateOf(PracticeState()) }
     val passageScroll = rememberLazyListState()
 
-    BackHandler(enabled = pane == ReadingPane.QUESTIONS) { pane = ReadingPane.PASSAGE }
+    BackHandler(enabled = session.pane == ReadingPane.QUESTIONS) { session = session.returnToPassage() }
+    LaunchedEffect(session.pane, session.context.itemIndex, session.context.itemOffset) {
+        if (session.pane == ReadingPane.PASSAGE) {
+            passageScroll.scrollToItem(
+                index = session.context.itemIndex.coerceIn(0, passage.paragraphs.size),
+                scrollOffset = session.context.itemOffset,
+            )
+        }
+    }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val readingGutter = if (maxWidth < 400.dp) 16.dp else contentPadding
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = contentPadding, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxSize().widthIn(max = 720.dp).align(Alignment.TopCenter),
         ) {
-            ScreenHeader("Part $part · Reading", onBack)
-            Notice("Đoạn văn và câu hỏi DEMO. Vị trí đọc được giữ trong phiên màn hình này, chưa kiểm chứng khôi phục sau Android process death.")
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                if (pane == ReadingPane.PASSAGE) {
-                    Button(onClick = {
-                        context = context.withPassageAnchor(
-                            passageScroll.firstVisibleItemIndex, passageScroll.firstVisibleItemScrollOffset,
-                        )
-                        pane = ReadingPane.QUESTIONS
-                    }, modifier = Modifier.heightIn(min = 48.dp)) {
-                        Text("Sang câu hỏi")
-                    }
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = readingGutter, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                ScreenHeader("Part $part · Reading", onBack)
+                Notice("Đoạn văn và câu hỏi DEMO. Vị trí đọc được giữ trong phiên màn hình này, chưa kiểm chứng khôi phục sau Android process death.")
+                if (session.pane == ReadingPane.PASSAGE) {
+                    Button(
+                        onClick = {
+                            session = session.openQuestions(
+                                passageScroll.firstVisibleItemIndex,
+                                passageScroll.firstVisibleItemScrollOffset,
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    ) { Text("Sang câu hỏi") }
                 } else {
                     OutlinedButton(
-                        onClick = { pane = ReadingPane.PASSAGE },
-                        modifier = Modifier.heightIn(min = 48.dp),
+                        onClick = { session = session.returnToPassage() },
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                     ) { Text("Về đoạn văn") }
                 }
+                Text(
+                    if (session.pane == ReadingPane.PASSAGE) "Đang đọc · trở về đúng vị trí trong phiên"
+                    else "Đang trả lời · có thể quay lại đoạn văn",
+                    color = AlphaTokens.Secondary,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                HorizontalDivider()
             }
-            Text(
-                if (pane == ReadingPane.PASSAGE) "Đang đọc · trở về đúng vị trí trong phiên"
-                else "Đang trả lời · có thể quay lại đoạn văn",
-                color = AlphaTokens.Secondary,
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            HorizontalDivider()
-        }
-        if (pane == ReadingPane.PASSAGE) {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                state = passageScroll,
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                    start = contentPadding, end = contentPadding, bottom = 32.dp,
-                ),
-                verticalArrangement = Arrangement.spacedBy(18.dp),
-            ) {
-                item { Text(passage.title, style = MaterialTheme.typography.titleMedium) }
-                items(passage.paragraphs) { paragraph ->
-                    Text(paragraph, style = MaterialTheme.typography.bodyLarge)
-                }
-            }
-        } else {
-            val chosen = questions.firstOrNull { it.id == context.questionId } ?: questions.first()
-            Column(
-                modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-                    .padding(horizontal = contentPadding, vertical = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                Text("Câu hỏi gắn với đoạn: ${passage.title}", color = AlphaTokens.Secondary)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    questions.forEachIndexed { idx, question ->
-                        val selected = chosen.id == question.id
-                        if (selected) {
-                            Button(
-                                onClick = { context = context.withQuestion(question) },
-                                modifier = Modifier.heightIn(min = 48.dp),
-                            ) { Text("${idx + 1}") }
-                        } else {
-                            OutlinedButton(
-                                onClick = { context = context.withQuestion(question) },
-                                modifier = Modifier.heightIn(min = 48.dp),
-                            ) { Text("${idx + 1}") }
-                        }
+            if (session.pane == ReadingPane.PASSAGE) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    state = passageScroll,
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                        start = readingGutter, end = readingGutter, bottom = 32.dp,
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(18.dp),
+                ) {
+                    item { Text(passage.title, style = MaterialTheme.typography.titleMedium) }
+                    itemsIndexed(
+                        items = passage.paragraphs,
+                        key = { index, _ -> "${passage.id}-$index" },
+                    ) { _, paragraph ->
+                        Text(paragraph, style = MaterialTheme.typography.bodyLarge)
                     }
                 }
-                QuestionPanel(
-                    question = chosen,
-                    state = answers,
-                    onSelect = { i -> answers = PracticeRules.select(answers, chosen, i) },
-                    onReveal = { answers = PracticeRules.requestFeedback(answers, chosen) },
-                )
-                OutlinedButton(
-                    onClick = { pane = ReadingPane.PASSAGE },
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-                ) { Text("Đọc lại đoạn văn") }
+            } else {
+                val chosen = questions.firstOrNull { it.id == session.context.questionId } ?: questions.first()
+                Column(
+                    modifier = Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState())
+                        .padding(horizontal = readingGutter, vertical = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    Text("Câu hỏi gắn với đoạn: ${passage.title}", color = AlphaTokens.Secondary)
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth()
+                            .semantics { contentDescription = "Chọn câu hỏi gắn với đoạn văn" },
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        itemsIndexed(questions, key = { _, question -> question.id }) { idx, question ->
+                            val selected = chosen.id == question.id
+                            if (selected) {
+                                Button(
+                                    onClick = { session = session.selectQuestion(question) },
+                                    modifier = Modifier.heightIn(min = 48.dp)
+                                        .semantics { contentDescription = "Câu hỏi ${idx + 1}, đang chọn" },
+                                ) { Text("${idx + 1}") }
+                            } else {
+                                OutlinedButton(
+                                    onClick = { session = session.selectQuestion(question) },
+                                    modifier = Modifier.heightIn(min = 48.dp)
+                                        .semantics { contentDescription = "Câu hỏi ${idx + 1}" },
+                                ) { Text("${idx + 1}") }
+                            }
+                        }
+                    }
+                    QuestionPanel(
+                        question = chosen,
+                        state = answers,
+                        onSelect = { i -> answers = PracticeRules.select(answers, chosen, i) },
+                        onReveal = { answers = PracticeRules.requestFeedback(answers, chosen) },
+                    )
+                    OutlinedButton(
+                        onClick = { session = session.returnToPassage() },
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    ) { Text("Đọc lại đoạn văn") }
+                }
             }
         }
     }

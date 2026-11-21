@@ -39,6 +39,14 @@ fun main() {
     verify(anchor.itemIndex == 4 && anchor.itemOffset == 36, "Long passage anchor retained")
     verify(anchor.withQuestion(r2).itemIndex == 4, "Question switch doesn't reset passage")
     verify(anchor.withQuestion(r2).questionId == r2.id, "Question ID restored")
+    val readingSession = ReadingSession(ReadingPane.PASSAGE, ReadingContext(passage.id, r1.id))
+        .openQuestions(4, 36)
+        .selectQuestion(r2)
+        .returnToPassage()
+    verify(readingSession.pane == ReadingPane.PASSAGE, "Reading session returns to passage")
+    verify(readingSession.context.itemIndex == 4 && readingSession.context.itemOffset == 36,
+        "Reading session retains captured passage anchor")
+    verify(readingSession.context.questionId == r2.id, "Reading session retains selected question")
     val foreignQuestion = SyntheticCatalogue.questions(6)[0]
     verify(runCatching { anchor.withQuestion(foreignQuestion) }.isFailure, "Foreign passage blocked")
     verify(SyntheticCatalogue.parts.all { it.number in 1..7 }, "Part type constrained")
