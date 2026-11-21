@@ -405,7 +405,7 @@ private fun ReadingScreen(part: Int, onBack: () -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 ScreenHeader("Part $part · Reading", onBack)
-                Notice("Đoạn văn và câu hỏi DEMO. Vị trí đọc được giữ trong phiên màn hình này, chưa kiểm chứng khôi phục sau Android process death.")
+                Notice("Vị trí đọc chỉ được giữ trong màn hình này.")
                 if (session.pane == ReadingPane.PASSAGE) {
                     Button(
                         onClick = {
