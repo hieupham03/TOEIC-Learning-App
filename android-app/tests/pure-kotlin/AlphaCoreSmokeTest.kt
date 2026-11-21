@@ -43,7 +43,7 @@ fun main() {
     verify(runCatching { anchor.withQuestion(foreignQuestion) }.isFailure, "Foreign passage blocked")
     verify(SyntheticCatalogue.parts.all { it.number in 1..7 }, "Part type constrained")
     verify(SyntheticCatalogue.passagesOrProofAreSynthetic(), "No production answer evidence")
-    println("ALPHA PURE-KOTLIN CORE CHECKS: PASS ($assertions assertions); Android build NOT RUN")
+    println("ALPHA PURE-KOTLIN CORE CHECKS: PASS ($assertions assertions); this is not an Android build")
 }
 
 /** Extra explicit synthetic fixture assertion to prevent production misrepresentation. */

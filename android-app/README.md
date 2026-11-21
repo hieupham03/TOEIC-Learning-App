@@ -19,7 +19,15 @@ Local pure Kotlin core test without Android SDK:
 ./scripts/run_pure_kotlin_core_checks.sh
 ```
 
-Build Android app on a **properly configured** Android Studio / Gradle machine (Android SDK 36, JDK 17+, Gradle 8.13, Android Gradle Plugin 8.13.2, Kotlin 2.2.21). **The build was not run in the authoring environment**, where Android SDK and Gradle are unavailable.
+On Windows PowerShell, use the equivalent runner rather than WSL. It requires a
+Kotlin compiler and JDK 17+; supply their installation roots explicitly when
+they are not on `PATH`:
+
+```powershell
+.\scripts\run_pure_kotlin_core_checks.ps1 -KotlinHome C:\path\to\kotlinc -JavaHome C:\path\to\jdk
+```
+
+Build Android app on a **properly configured** Android Studio / Gradle machine (Android SDK 36, JDK 17+, Gradle 8.13, Android Gradle Plugin 8.13.2, Kotlin 2.2.21). Local Engineering Closure V0.3 executed the Debug build and local JVM unit tests; see `../docs/STAGE05_ALPHA_CX00_CX03_ENGINEERING_CLOSURE_V0.3.md` for bounded evidence and its limits.
 
 ```bash
 # After Gradle 8.13 and Android SDK are available:
