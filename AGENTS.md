@@ -1,3 +1,9 @@
+# Active Development Beta (PO chat-confirmed, bounded)
+
+Read `docs/STAGE05_DEVELOPMENT_BETA_READING_UI_PO_AUTHORIZATION_V0.1.md` **before any coding**. The PO approved bounded *synthetic Reading UI development only* following Alpha Closure V0.3. Scope IDs: **BUI-01 / BUI-02 / BUI-03**, **NOT CX-04** (CX-04 remains Listening/media and is NOT authorized). Work on `development/beta-reading-ui` only. Permitted: synthetic Compose Reading UI/layout, source-level accessibility hardening, tests, Gradle build, optional local Compose Preview (engineering observations only). Not permitted: device/emulator/learner tests, formal ECP/QA, backend/API, persistence/ACK, clock, real B1/Full Mock, media, other CX-04+, costs, or signed baseline edits. Do not claim a QA PASS. Continue to obey all former G05-CP and baseline restrictions. Previous Alpha-only stop rule below is historical for the Alpha branch and is superseded **only for the narrowly authorized BUI-01..03** on this Beta branch.
+
+---
+
 # AGENTS.md — TOEIC Learning App / Codex instructions (latest)
 
 ## Current signed authority
