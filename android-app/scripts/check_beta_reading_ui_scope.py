@@ -25,7 +25,7 @@ checks = {
     "radio choices expose native selection semantics": "Role.RadioButton" in ui and ".selectable(" in ui,
     "tap targets are source-targeted at 48dp": "heightIn(min = 48.dp)" in ui,
     "no remote data package": not (app / "data/remote").exists(),
-    "no media assets introduced": not any((root / "app/src/main").rglob("*.mp3")),
+    "no MP3 fixtures": not any((root / "app/src/main").rglob("*.mp3")),
 }
 
 for name, ok in checks.items():

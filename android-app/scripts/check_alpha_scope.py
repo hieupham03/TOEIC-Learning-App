@@ -19,7 +19,7 @@ checks = {
     'reading has passage return': 'Về đoạn văn' in ui and 'Đọc lại đoạn văn' in ui,
     'three approved tab labels': all(s in ui for s in ('Bắt đầu', 'Tiến độ', 'Cá nhân')),
     'no backend dependencies': not (root/'app/src/main/java/vn/toeiclearning/alpha/data/remote').exists(),
-    'no real test attempts': not any((root/'app/src/main').rglob('*.mp3')),
+    'no MP3 fixtures': not any((root/'app/src/main').rglob('*.mp3')),
 }
 for name, ok in checks.items():
     print(('PASS' if ok else 'FAIL') + ' static: ' + name)

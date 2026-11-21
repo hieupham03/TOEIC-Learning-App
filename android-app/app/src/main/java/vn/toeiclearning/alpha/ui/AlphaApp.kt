@@ -60,7 +60,9 @@ import vn.toeiclearning.alpha.domain.ReadingSession
 import vn.toeiclearning.alpha.domain.SyntheticCatalogue
 import vn.toeiclearning.alpha.domain.SyntheticQuestion
 
-private enum class AlphaRoute { HOME, PARTS, PRACTICE, READING, MOCK_INFO, PROGRESS, PROFILE }
+private enum class AlphaRoute {
+    HOME, PARTS, PRACTICE, READING, LISTENING_DEMO, LISTENING_ITEM, MOCK_INFO, PROGRESS, PROFILE
+}
 private enum class AlphaTab(val title: String) { START("Bắt đầu"), PROGRESS("Tiến độ"), PROFILE("Cá nhân") }
 private val contentPadding = 20.dp
 
@@ -68,6 +70,7 @@ private val contentPadding = 20.dp
 fun AlphaApp() {
     var route by rememberSaveable { mutableStateOf(AlphaRoute.HOME) }
     var part by rememberSaveable { mutableIntStateOf(5) }
+    var listeningPart by rememberSaveable { mutableIntStateOf(1) }
 
     val activeTab = when (route) {
         AlphaRoute.PROGRESS -> AlphaTab.PROGRESS
@@ -78,6 +81,7 @@ fun AlphaApp() {
     BackHandler(enabled = route != AlphaRoute.HOME) {
         route = when (route) {
             AlphaRoute.PRACTICE, AlphaRoute.READING -> AlphaRoute.PARTS
+            AlphaRoute.LISTENING_ITEM -> AlphaRoute.LISTENING_DEMO
             AlphaRoute.MOCK_INFO -> AlphaRoute.HOME
             else -> AlphaRoute.HOME
         }
@@ -120,6 +124,7 @@ fun AlphaApp() {
                 AlphaRoute.HOME -> TaskHub(
                     onParts = { route = AlphaRoute.PARTS },
                     onMock = { route = AlphaRoute.MOCK_INFO },
+                    onListeningDemo = { route = AlphaRoute.LISTENING_DEMO },
                 )
                 AlphaRoute.PARTS -> PartPicker(
                     onBack = { route = AlphaRoute.HOME },
@@ -135,6 +140,16 @@ fun AlphaApp() {
                 }
                 AlphaRoute.READING -> key(part) {
                     ReadingScreen(part = part, onBack = { route = AlphaRoute.PARTS })
+                }
+                AlphaRoute.LISTENING_DEMO -> ListeningDemoPicker(
+                    onBack = { route = AlphaRoute.HOME },
+                    onPart = {
+                        listeningPart = it
+                        route = AlphaRoute.LISTENING_ITEM
+                    },
+                )
+                AlphaRoute.LISTENING_ITEM -> key(listeningPart) {
+                    ListeningDemoItem(listeningPart, onBack = { route = AlphaRoute.LISTENING_DEMO })
                 }
                 AlphaRoute.MOCK_INFO -> MockBlockedScreen(onBack = { route = AlphaRoute.HOME })
                 AlphaRoute.PROGRESS -> PlaceholderScreen(
@@ -153,7 +168,7 @@ fun AlphaApp() {
 }
 
 @Composable
-private fun ScreenHeader(title: String, onBack: (() -> Unit)? = null) {
+internal fun ScreenHeader(title: String, onBack: (() -> Unit)? = null) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (onBack != null) {
             TextButton(onClick = onBack, modifier = Modifier.heightIn(min = 48.dp)) {
@@ -170,7 +185,7 @@ private fun ScreenHeader(title: String, onBack: (() -> Unit)? = null) {
 }
 
 @Composable
-private fun Notice(message: String, warning: Boolean = false) {
+internal fun Notice(message: String, warning: Boolean = false) {
     Surface(
         color = if (warning) AlphaTokens.WarningBackground else AlphaTokens.Muted,
         shape = RoundedCornerShape(12.dp),
@@ -185,7 +200,7 @@ private fun Notice(message: String, warning: Boolean = false) {
 }
 
 @Composable
-private fun TaskHub(onParts: () -> Unit, onMock: () -> Unit) {
+private fun TaskHub(onParts: () -> Unit, onMock: () -> Unit, onListeningDemo: () -> Unit) {
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
             .padding(horizontal = contentPadding, vertical = 24.dp),
@@ -209,6 +224,12 @@ private fun TaskHub(onParts: () -> Unit, onMock: () -> Unit) {
             description = "Hai đề B1 bắt buộc, mỗi đề 200 câu. Chưa QA và không thể làm thi thật trong Alpha.",
             buttonText = "Xem điều kiện mở thi",
             onClick = onMock,
+        )
+        ModeCard(
+            title = "Listening DEMO · Part 1–4",
+            description = "Thử trình phát với âm thanh tự tạo. Không phải bài nghe TOEIC.",
+            buttonText = "Mở Listening DEMO",
+            onClick = onListeningDemo,
         )
         Notice("Không có câu hỏi, điểm, thời gian thi hoặc lưu đáp án thật trong bản Alpha này.")
     }
