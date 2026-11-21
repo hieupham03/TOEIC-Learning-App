@@ -1,22 +1,20 @@
-# AGENTS.md — Current scoped authority: CX-04 Audio Output + Rights Screening
+# AGENTS.md — One public Listening sample fetch (PO-authorized)
 
-## Active PO approval D05-CX04-AUDIO-014=A
+**Current user direction:** The Product Owner explicitly requested to find/crawl **one arbitrary Listening sample** and confirmed that the PO will handle the rights. Prior PO rights affirmation is recorded in `docs/STAGE05_LISTENING_PO_RIGHTS_REAFFIRMATION_V0.1.md`. The scope here is a **single narrowly bounded source acquisition**, not a new content distribution, QA or development approval.
 
-The Product Owner approved the post-CX04 next step: **local synthetic audio OUTPUT evidence** and **read-only Listening learning-content source-rights screening**. Binding record: `docs/STAGE05_D05_CX04_AUDIO_014_A_APPROVAL_RECORD_V1.0.md`. Codex execution handoff: `codex_handoff/CX04_AUDIO_OUTPUT_AND_RIGHTS_SCREENING_EXECUTION_V0.1.md`. **Read both before work.**
+## Exact working instructions
 
-Work only on **`validation/cx04-audio-output-rights`**. Base source commit `94f77184e810a077130539e6895a3d9acf7a5726` was CX-04 engineering closure; it was **not formal QA or verified host audibility**. Do not rewrite existing branches or edit signed baselines. Preserve any uncommitted work.
+- Branch: `ingestion/one-zenlish-p3-32-34`.
+- Read `docs/STAGE05_SINGLE_LISTENING_SAMPLE_ACQUISITION_RECORD_V0.1.md`.
+- Candidate: Zenlish `TEST 1 – 2022` / **Part 3 question group 32–34**, group ID `41021`.
+- Public page: `https://zenlishtoeic.vn/stm-quizzes/test-1-2022/`.
+- Direct referenced MP3: `https://zenlishtoeic.vn/wp-content/uploads/2023/04/zenlish-test-01-part-3-32-34.mp3`.
+- Run `python scripts/crawl_one_zenlish_part3_group.py --self-test` then `python scripts/crawl_one_zenlish_part3_group.py --output .tooling/one-listening-sample` from `android-app/`.
+- Verify 3 questions, group/item relation, A–D choices, local MP3 header, byte count, hash, and playable file duration if a local decoder is available. The indexed correct-answer fields are blank: mark `ANSWER_KEY_NOT_VERIFIED` and `NOT_QA_READY`, never invent answers.
+- Save source HTML, full questions/choices, MP3 and any original private proofs **only under ignored local `.tooling/`**. **Never push real audio, scraped question text or source HTML to this PUBLIC GitHub repo**.
+- Commit a text-only `docs/STAGE05_SINGLE_LISTENING_SAMPLE_CRAWL_REPORT_V0.1.md` reporting truthful PASS/PARTIAL/BLOCKED, source URL, group ID, timestamps, sizes/hashes, local path and outstanding QA/provenance gaps. Do not claim the site refused access merely because the assistant environment had unavailable DNS.
+- Do not bypass login, CAPTCHA, robots/anti-abuse measures, access restrictions or paywalls, and do not crawl further groups. If HTML/API is inaccessible, report the blocker. No vendor contact or payment.
 
-### Approved scope ONLY
+**Not authorized:** integrating this third-party MP3 into `app/src/main/assets`, changing `SyntheticCatalogue` readiness, exposing B1 Full Mock, uploading content to public app distribution, formal QA/ECP, new CX features, backend, durable ACK, clock, real learner or physical-device test, spending or signed baseline modifications. Existing Stage05 CONDITIONAL PASS, G05-CP01..08 ACTIVE and content QA NOT VERIFIED remain unchanged.
 
-- **AOV-01:** verify source/fixture hashes and capture **real local Android Emulator audio-output evidence** for the existing four programmatically generated synthetic WAV tones; distinguish player callbacks from actual audio-output signal capture. Use safe isolated local capture at no cost, record thresholds and actual outcomes. If impossible, report **BLOCKED**, do not invent output.
-- **AOV-02:** report actual method, AVD/OS/capture route, hashes/measurements and PASS/FAIL/BLOCKED/NOT RUN; optional small reversible fix to existing CX-04 transport only if a demonstrable bug, with Alpha/Beta/CX04 static checks, Kotlin smoke and local Gradle unit/build reruns.
-- **RGT-01:** read-only research of **public official** Listening content source/license options, source URLs/dates and per-asset rights criteria. Distinguish verified rights for a specific asset versus only a marketing “free” claim. **No media ingest, English speech/TTS generation, vendor contract or content selection.**
-- Commit only text reports `docs/STAGE05_CX04_AUDIO_OUTPUT_EVIDENCE_REPORT_V0.1.md` and `docs/STAGE05_LISTENING_AUDIO_SOURCE_RIGHTS_SCREENING_REGISTER_V0.1.md` plus proven small fixes/tests. Keep captured audio, APK, emulator screenshots, raw logs, credentials and user data LOCAL — GitHub repo remains PUBLIC.
-
-### Still STOP — unaffected controls
-
-No new features `CX-05..09`, actual TOEIC/B1 media or English speech/TTS, user PDFs/books/audio ingest, live Full Mock, real Android phone or learner test, formal ECP/QA, release/pilot, backend/API/DB, app account/auth, durable answer ACK, authoritative clock, ARCH03 selection, paid services/budget expenditure, or modifications to approved Vision/PRD/SRS/Acceptance/Design/UI-G baseline bytes. Existing Part1–4 real bank and Full Mock remain NOT_QA_READY/blocked.
-
-Prior approval `D05-CX04-013=A` allowed **synthetic transport development**, not production rights or QA. `D05-DEV-GATE-012=A` remains Stage05 **CONDITIONAL PASS FOR DEVELOPMENT TRANSITION ONLY**. G05-CP01..08 and previous CPs ACTIVE; POL01..16 OPEN; B1 content QA NOT VERIFIED; budget DEFERRED.
-
-**Never equate MediaPlayer state with audible output, and never equate a candidate source with a licensed, ship-ready asset.** Stop after the bounded audio-evidence and rights-screening deliverables.
+Old AOV/CX04 development approvals remain historical facts but do not expand this branch's task beyond **one source group download and private evidence check**.
