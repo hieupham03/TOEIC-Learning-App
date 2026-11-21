@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Offline Listening import preparation manifest",
+  "type": "object",
+  "required": ["schema_version", "groups"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "groups": {"type": "array", "minItems": 1, "maxItems": 4, "items": {"$ref": "#/$defs/group"}}
+  },
+  "$defs": {
+    "id": {"type": "string", "minLength": 1},
+    "https": {"type": "string", "pattern": "^https://"},
+    "hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "path": {"type": "string", "minLength": 1, "description": "Portable path relative to the manifest; no traversal or external links."},
+    "source": {
+      "type": "object",
+      "required": ["site", "page_url", "snapshot_sha256", "version", "retrieved_at_utc"],
+      "properties": {
+        "site": {"$ref": "#/$defs/id"},
+        "page_url": {"$ref": "#/$defs/https"},
+        "snapshot_sha256": {"$ref": "#/$defs/hash"},
+        "snapshot_path": {"anyOf": [{"$ref": "#/$defs/path"}, {"type": "null"}]},
+        "version": {"$ref": "#/$defs/id"},
+        "retrieved_at_utc": {"type": "string", "format": "date-time"}
+      }
+    },
+    "media": {
+      "type": "object",
+      "required": ["id", "group_id", "path", "source_url", "bytes", "sha256", "mime", "format"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "group_id": {"$ref": "#/$defs/id"},
+        "path": {"$ref": "#/$defs/path"},
+        "source_url": {"$ref": "#/$defs/https"},
+        "bytes": {"type": "integer", "minimum": 1, "maximum": 12582912},
+        "sha256": {"$ref": "#/$defs/hash"},
+        "mime": {"enum": ["audio/mpeg", "audio/wav", "image/png", "image/jpeg"]},
+        "format": {"enum": ["mp3", "wav", "png", "jpeg"]}
+      }
+    },
+    "audio": {
+      "allOf": [
+        {"$ref": "#/$defs/media"},
+        {
+          "required": ["requested_url", "item_ids", "sample_rate_hz", "channels",
+                       "duration_seconds", "duration_method", "decode_status"],
+          "properties": {
+            "mime": {"enum": ["audio/mpeg", "audio/wav"]},
+            "requested_url": {"$ref": "#/$defs/https"},
+            "item_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+            "sample_rate_hz": {"type": "integer", "minimum": 1},
+            "channels": {"type": "integer", "minimum": 1},
+            "duration_seconds": {"type": "number", "exclusiveMinimum": 0},
+            "duration_method": {"enum": ["mpeg_frame_estimate", "pcm_frame_count"]},
+            "decode_status": {"enum": ["NOT_RUN", "PASS", "FAIL"]},
+            "probe_status": {"enum": ["NOT_RUN", "PASS", "FAIL"]}
+          }
+        }
+      ]
+    },
+    "image": {
+      "allOf": [
+        {"$ref": "#/$defs/media"},
+        {
+          "required": ["item_id"],
+          "properties": {"item_id": {"$ref": "#/$defs/id"}, "mime": {"enum": ["image/png", "image/jpeg"]}}
+        }
+      ]
+    },
+    "question": {
+      "type": "object",
+      "required": ["id", "group_id", "index", "presentation", "prompt", "choices"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "group_id": {"$ref": "#/$defs/id"},
+        "source_item_id": {"type": ["string", "null"]},
+        "index": {"type": "integer", "minimum": 1},
+        "presentation": {"enum": ["WRITTEN", "SOURCE_LABELS_ONLY"]},
+        "prompt": {"type": ["string", "null"]},
+        "choices": {
+          "type": "object", "required": ["A", "B", "C"], "additionalProperties": false,
+          "properties": {"A": {"type": "string"}, "B": {"type": "string"}, "C": {"type": "string"}, "D": {"type": "string"}}
+        },
+        "image_required": {"type": "boolean"},
+        "image": {"anyOf": [{"$ref": "#/$defs/image"}, {"type": "null"}]},
+        "answer": {
+          "type": "object", "required": ["status", "label"],
+          "properties": {
+            "status": {"enum": ["ANSWER_KEY_UNVERIFIED", "SOURCE_EXPLICIT", "VERIFIED"]},
+            "label": {"enum": ["A", "B", "C", "D", null]},
+            "evidence": {"type": ["string", "null"]}
+          }
+        }
+      }
+    },
+    "group": {
+      "type": "object",
+      "required": ["id", "source_group_id", "source", "part", "sequence", "retrieval_status",
+                   "expected_indices", "questions", "audio_binding", "audio", "qa", "rights"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "source_group_id": {"$ref": "#/$defs/id"},
+        "source": {"$ref": "#/$defs/source"},
+        "part": {"type": "integer", "minimum": 1, "maximum": 4},
+        "sequence": {"type": "integer", "minimum": 1},
+        "retrieval_status": {"enum": ["FETCHED", "PARTIAL", "BLOCKED", "NOT_RUN"]},
+        "expected_indices": {"type": "array", "items": {"type": "integer", "minimum": 1}},
+        "questions": {"type": "array", "items": {"$ref": "#/$defs/question"}},
+        "audio_binding": {
+          "type": "object", "required": ["id", "url"],
+          "properties": {"id": {"$ref": "#/$defs/id"}, "url": {"$ref": "#/$defs/https"}}
+        },
+        "audio": {"anyOf": [{"$ref": "#/$defs/audio"}, {"type": "null"}]},
+        "qa": {
+          "type": "object", "required": ["status"],
+          "properties": {"status": {"enum": ["NOT_RUN", "PENDING", "APPROVED", "REJECTED"]}, "evidence": {"type": ["string", "null"]}}
+        },
+        "rights": {
+          "type": "object", "required": ["status"],
+          "properties": {
+            "status": {"enum": ["PO_DECLARED_NOT_INSPECTED", "UNVERIFIED", "VERIFIED_FOR_SCOPE", "NOT_ALLOWED"]},
+            "evidence": {"type": ["string", "null"]}
+          }
+        }
+      }
+    }
+  }
+}
