@@ -1,31 +1,22 @@
-# AGENTS.md — TOEIC Learning App / Codex (current branch authority)
+# AGENTS.md — Current scoped authority: CX-04 Audio Output + Rights Screening
 
-## Active PO decision — 2026-11-21
+## Active PO approval D05-CX04-AUDIO-014=A
 
-**D05-CX04-013=A is APPROVED BY PRODUCT OWNER**, scoped to **Development CX-04 synthetic Listening foundation only**: `CX04-L01..L03` plus **one local Android Emulator engineering smoke check**. The exact binding approval is `docs/STAGE05_D05_CX04_013_A_APPROVAL_RECORD_V1.0.md`; the detailed scope is `docs/STAGE05_D05_CX04_013_LISTENING_DEVELOPMENT_DECISION_PROPOSAL_V0.1.md`; the executable instructions are `codex_handoff/CX04_SYNTHETIC_LISTENING_AUTHORIZED_EXECUTION_V0.1.md`. **Read these before changing code.**
+The Product Owner approved the post-CX04 next step: **local synthetic audio OUTPUT evidence** and **read-only Listening learning-content source-rights screening**. Binding record: `docs/STAGE05_D05_CX04_AUDIO_014_A_APPROVAL_RECORD_V1.0.md`. Codex execution handoff: `codex_handoff/CX04_AUDIO_OUTPUT_AND_RIGHTS_SCREENING_EXECUTION_V0.1.md`. **Read both before work.**
 
-**Work exclusively on:** `development/cx04-listening-synthetic`. Source baseline: completed EUI engineering commit `52e0af4a051edb5832262a0720f1dd486012a4f5` (no QA PASS). Do not rewrite old branches. Preserve any local user changes safely.
+Work only on **`validation/cx04-audio-output-rights`**. Base source commit `94f77184e810a077130539e6895a3d9acf7a5726` was CX-04 engineering closure; it was **not formal QA or verified host audibility**. Do not rewrite existing branches or edit signed baselines. Preserve any uncommitted work.
 
-The original `D05-DEV-GATE-012=A` remains Stage05 **CONDITIONAL PASS FOR DEVELOPMENT TRANSITION ONLY**. G05-CP01..08 plus all other Stage02/03/04 CPs ACTIVE, POL01..16 OPEN, budget DEFERRED. Existing Vision V1.0 / PRD-SRS V0.6 / Acceptance V0.4 / Design V0.3 / UI-G01..16 **controlled baseline bytes immutable**.
+### Approved scope ONLY
 
-## The ONLY newly permitted behavior
+- **AOV-01:** verify source/fixture hashes and capture **real local Android Emulator audio-output evidence** for the existing four programmatically generated synthetic WAV tones; distinguish player callbacks from actual audio-output signal capture. Use safe isolated local capture at no cost, record thresholds and actual outcomes. If impossible, report **BLOCKED**, do not invent output.
+- **AOV-02:** report actual method, AVD/OS/capture route, hashes/measurements and PASS/FAIL/BLOCKED/NOT RUN; optional small reversible fix to existing CX-04 transport only if a demonstrable bug, with Alpha/Beta/CX04 static checks, Kotlin smoke and local Gradle unit/build reruns.
+- **RGT-01:** read-only research of **public official** Listening content source/license options, source URLs/dates and per-asset rights criteria. Distinguish verified rights for a specific asset versus only a marketing “free” claim. **No media ingest, English speech/TTS generation, vendor contract or content selection.**
+- Commit only text reports `docs/STAGE05_CX04_AUDIO_OUTPUT_EVIDENCE_REPORT_V0.1.md` and `docs/STAGE05_LISTENING_AUDIO_SOURCE_RIGHTS_SCREENING_REGISTER_V0.1.md` plus proven small fixes/tests. Keep captured audio, APK, emulator screenshots, raw logs, credentials and user data LOCAL — GitHub repo remains PUBLIC.
 
-- **CX04-L01:** Distinct synthetic-only Listening **DEMO/LAB** flow for Parts 1–4 with fake group/item data and visibly labelled unapproved audio/content; real Part1–4 bank stays `NOT_QA_READY`. Do not unlock Full Mock.
-- **CX04-L02:** Bundled original **programmatically generated WAV tones** (NOT English speech/TOEIC), one group per Part 1–4; versioned and hash-attributed mapping `part/group/item/audio/order`; local demo play/pause/stop/replay/error states. No streaming/cloud services.
-- **CX04-L03:** Fail-closed tests for missing/mismatched/duplicate/out-of-order assets, existing Reading/Part5 regressions, source guards, Kotlin smoke, Gradle build/unit tests, actual command exit codes, safety report.
-- **Exactly one** local Android Emulator engineering smoke check of the synthetic audio flow; not a real phone, learner, ECP, QA or official media-integrity proof.
-- Reversible implementation details may be decided autonomously. No per-file microapproval requests.
+### Still STOP — unaffected controls
 
-## Explicit STOP / still prohibited
+No new features `CX-05..09`, actual TOEIC/B1 media or English speech/TTS, user PDFs/books/audio ingest, live Full Mock, real Android phone or learner test, formal ECP/QA, release/pilot, backend/API/DB, app account/auth, durable answer ACK, authoritative clock, ARCH03 selection, paid services/budget expenditure, or modifications to approved Vision/PRD/SRS/Acceptance/Design/UI-G baseline bytes. Existing Part1–4 real bank and Full Mock remain NOT_QA_READY/blocked.
 
-No real or unverified B1/ETS Listening audio/questions, no speech/TTS or licensed/downloaded assets without separate provenance authority, no real Full Mock A/B or official scoring, no clean/comparable attempt or time/replay integrity system. Do not implement `CX05..CX09`, cloud/backend/API/remote DB, authentication, real data, app persistence/durable ACK, authoritative timer, ARCH03 A/B/C selection, ARCH04, PDF/book/audio import, real device, learner tests, QA-01..08, ECP-00..06, pilot, Play Store release, new vendor/paid tooling/spending, or any signed baseline change. Two real B1 200Q forms remain inventoried but not QA cleared.
+Prior approval `D05-CX04-013=A` allowed **synthetic transport development**, not production rights or QA. `D05-DEV-GATE-012=A` remains Stage05 **CONDITIONAL PASS FOR DEVELOPMENT TRANSITION ONLY**. G05-CP01..08 and previous CPs ACTIVE; POL01..16 OPEN; B1 content QA NOT VERIFIED; budget DEFERRED.
 
-**Traceability:** FR-003 / AT-03 are bounded design/engineering links, NOT formal PASS. FR-011 / AT-11 are boundaries only and not implemented. DEMO replay must NOT leak into Full Mock.
-
-## Required evidence and handoff
-
-Check the safe branch, compile Android, run existing Alpha/Beta checks and newly added Listening negative-unit checks, and run the one permitted local Android Emulator check when available. Distinguish **PASS / FAIL / BLOCKED / NOT RUN**; do not invent screenshots or auditory observations. Leave APK, emulator screenshots, raw logs and credentials local; repo is **PUBLIC**. Commit only in-scope code, safe synthetic tone fixtures, tests and `docs/STAGE05_CX04_SYNTHETIC_LISTENING_ENGINEERING_REPORT_V0.1.md`. Include changed paths, fixture hashes, actual toolchain/output and remaining evidence gaps. Stop after CX04-L01..03 and the one emulator check.
-
-## Historical authority and preserved engineering work
-
-Alpha CX-00..03 approved in `docs/STAGE05_D05_DEV_GATE_012_A_APPROVAL_RECORD_V1.0.md`, Beta BUI-01..03 authorized under `docs/STAGE05_DEVELOPMENT_BETA_READING_UI_PO_AUTHORIZATION_V0.1.md`, EUI-01..03 under `docs/STAGE05_SYNTHETIC_ANDROID_EMULATOR_UI_CHECK_AUTHORIZATION_V0.1.md`. Their historical "NO CX04" constraints are superseded **only** by the current explicitly scoped `D05-CX04-013=A`. No old documentary PENDING label overrides the new signed-in-chat PO decision. All other controls remain in force.
+**Never equate MediaPlayer state with audible output, and never equate a candidate source with a licensed, ship-ready asset.** Stop after the bounded audio-evidence and rights-screening deliverables.
