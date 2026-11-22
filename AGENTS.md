@@ -1,3 +1,11 @@
+# CURRENT OVERRIDE — PO RIGHTS HANDLED / FAST TRACK (2026-11-22)
+
+**READ FIRST:** `docs/STAGE05_FASTTRACK_PO_RIGHTS_AND_EXECUTION_PRIORITY_V0.2.md`. The PO confirms 100% of their copyright/legal-rights matters have been handled. **Stop any repetitive rights research, licensing questions or demands for another blanket declaration.** The repo records rights as PO-confirmed for planning; record only technical file ID/hash/source mapping for provenance. Earlier instructions demanding redundant external license investigation are superseded for Fast Track workflow, but any actual content QA, privacy, Play requirements and signed integrity gates remain binding.
+
+**Execution priority:** FAST-01+02 one autonomous session to produce local offline Android APK for 2-person internal preview by 2026-11-24, then FAST-03+04 test-track AAB/readiness by 2026-12-06. No unnecessary policy memo loops. Real crawled samples may be used in **private local demo testing with explicit unverified-content labeling and NO unverified answer scoring**; never commit raw copied media/questions to PUBLIC Git. Full Mock, formal QA and Production remain blocked absent the existing required evidence.
+
+---
+
 # AGENTS.md — Fast-track 48-hour Android internal preview / 14-day Play test-track readiness
 
 ## Current PO directive, 2026-11-22
