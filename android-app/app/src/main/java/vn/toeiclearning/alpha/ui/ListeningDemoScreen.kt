@@ -145,7 +145,7 @@ private fun SpokenPart3Demo(onBack: () -> Unit, onPrevious: (() -> Unit)?, onNex
 }
 
 @Composable
-private fun rememberListeningPlayer(asset: ListeningAsset): LocalListeningPlayer {
+internal fun rememberListeningPlayer(asset: ListeningAsset): LocalListeningPlayer {
     val assets = LocalContext.current.assets
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val scope = rememberCoroutineScope()
@@ -164,7 +164,7 @@ private fun rememberListeningPlayer(asset: ListeningAsset): LocalListeningPlayer
 }
 
 @Composable
-private fun PlaybackControls(playback: LocalListeningPlayer) {
+internal fun PlaybackControls(playback: LocalListeningPlayer, study: Boolean = false) {
     val state = playback.state
     val status = when (state) {
         PlaybackState.IDLE -> "Chưa phát"
@@ -178,7 +178,7 @@ private fun PlaybackControls(playback: LocalListeningPlayer) {
         PlaybackState.ERROR -> "Không thể phát âm thanh thử nghiệm."
     }
     Text(
-        status,
+        if (study) status.replace(" thử nghiệm", "") else status,
         modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
         style = MaterialTheme.typography.bodyLarge,
     )

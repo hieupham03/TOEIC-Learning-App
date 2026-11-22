@@ -16,6 +16,7 @@ android {
         versionName = "0.2.1-preview"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("boolean", "LOCAL_LISTENING_PREVIEW", "false")
+        buildConfigField("boolean", "LOCAL_STUDY", "false")
     }
 
     buildTypes {
@@ -27,8 +28,16 @@ android {
             versionNameSuffix = "-lab"
             buildConfigField("boolean", "LOCAL_LISTENING_PREVIEW", "true")
         }
+        create("study") {
+            initWith(getByName("debug"))
+            matchingFallbacks += "debug"
+            applicationIdSuffix = ".study"
+            versionNameSuffix = "-study"
+            buildConfigField("boolean", "LOCAL_STUDY", "true")
+        }
     }
     sourceSets.getByName("localPreview").assets.srcDir("../.tooling/fasttrack-handoff/part3-assets")
+    sourceSets.getByName("study").assets.srcDir("../.tooling/two-user-study/assets")
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
