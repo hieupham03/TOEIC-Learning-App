@@ -68,7 +68,7 @@ internal fun StudyApp() {
     var goalInput by remember { mutableStateOf("") }
     fun day() = LocalDate.now().toString()
     fun mockTime() = MockTime(
-        Settings.Global.getInt(context.contentResolver, Settings.Global.BOOT_COUNT, -1),
+        runCatching { Settings.Global.getInt(context.contentResolver, Settings.Global.BOOT_COUNT, -1) }.getOrDefault(-1),
         SystemClock.elapsedRealtime(), System.currentTimeMillis(),
     )
     var clock by remember { mutableStateOf(mockTime()) }

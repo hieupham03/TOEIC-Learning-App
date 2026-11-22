@@ -3,7 +3,9 @@ package vn.toeiclearning.alpha.study
 import android.content.ContentValues
 import android.content.Context
 import android.database.Cursor
+import android.database.DatabaseErrorHandler
 import android.database.sqlite.SQLiteDatabase
+import android.database.sqlite.SQLiteDatabaseCorruptException
 import android.database.sqlite.SQLiteOpenHelper
 import android.database.sqlite.SQLiteException
 import org.json.JSONArray
@@ -20,7 +22,10 @@ internal data class StudyDashboard(
     val goal: Int,
 )
 
-internal class StudyStore(context: Context) : SQLiteOpenHelper(context, "phone-study.db", null, 1) {
+internal class StudyStore(context: Context) : SQLiteOpenHelper(
+    context, "phone-study.db", null, 1,
+    DatabaseErrorHandler { throw SQLiteDatabaseCorruptException("Local study database is unreadable") },
+) {
     override fun onConfigure(db: SQLiteDatabase) {
         db.rawQuery("PRAGMA secure_delete=ON", null).use { it.moveToFirst() }
     }

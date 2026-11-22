@@ -161,7 +161,9 @@ internal fun StudySession(
                             else if (phase == MockPhase.LISTENING) MockAudio(attempt, it, busy, onChange)
                         }
                     }
-                    group.image?.let { StudyImage(it, if (hasPassage) "Ảnh đoạn văn" else "Ảnh câu hỏi", allowZoom = hasPassage) }
+                    if (!hasPassage || attempt.complete) {
+                        group.image?.let { StudyImage(it, if (hasPassage) "Ảnh đoạn văn" else "Ảnh câu hỏi", allowZoom = hasPassage) }
+                    }
                     if (attempt.complete) group.passage?.let { Text(it, style = MaterialTheme.typography.bodyLarge) }
                     Text("Câu ${item.number}${if (item.prompt.isBlank()) "" else " · ${item.prompt}"}",
                         style = MaterialTheme.typography.titleMedium)
@@ -254,18 +256,20 @@ private fun MockAudio(attempt: StudyAttempt, asset: ListeningAsset, busy: Boolea
 @Composable
 private fun StudyImage(asset: ListeningAsset, description: String, allowZoom: Boolean) {
     val assets = LocalContext.current.assets
-    val bitmap by produceState<Bitmap?>(null, asset, assets) {
-        value = withContext(Dispatchers.IO) {
+    val image by produceState<Pair<Boolean, Bitmap?>>(false to null, asset, assets) {
+        value = false to null
+        val bitmap = withContext(Dispatchers.IO) {
             runCatching {
                 val bytes = assets.open(asset.path).use { it.readBytes() }
                 if (asset.matches(bytes)) BitmapFactory.decodeByteArray(bytes, 0, bytes.size) else null
             }.getOrNull()
         }
+        value = true to bitmap
     }
     var zoomed by remember(asset) { mutableStateOf(false) }
-    bitmap?.let { picture ->
+    image.second?.let { picture ->
         if (allowZoom) StudyButton(if (zoomed) "Thu ảnh" else "Phóng ảnh đoạn văn") { zoomed = !zoomed }
         val size = if (zoomed) Modifier.horizontalScroll(rememberScrollState()).width(650.dp) else Modifier.fillMaxWidth()
         Image(picture.asImageBitmap(), description, size.aspectRatio(picture.width.toFloat() / picture.height))
-    } ?: Text("Đang mở ảnh hoặc ảnh không khả dụng.")
+    } ?: Text(if (image.first) "Ảnh không khả dụng." else "Đang mở ảnh…")
 }
