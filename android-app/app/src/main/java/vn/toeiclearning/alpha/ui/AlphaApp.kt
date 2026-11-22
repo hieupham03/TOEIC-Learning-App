@@ -17,7 +17,11 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -77,7 +81,6 @@ fun AlphaApp() {
     var readingAnswers by remember { mutableStateOf(PracticeState()) }
     var listeningAnswers by remember { mutableStateOf(emptyMap<String, String>()) }
     var confirmClear by remember { mutableStateOf(false) }
-    val totalSelected = readingAnswers.selectedById.size + listeningAnswers.size
 
     val activeTab = when (route) {
         AlphaRoute.PROGRESS -> AlphaTab.PROGRESS
@@ -96,10 +99,12 @@ fun AlphaApp() {
 
     Scaffold(
         containerColor = AlphaTokens.Background,
+        contentWindowInsets = WindowInsets.safeDrawing,
         bottomBar = {
             Surface(color = AlphaTokens.Surface, shadowElevation = 1.dp) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().navigationBarsPadding()
+                    modifier = Modifier.fillMaxWidth()
+                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))
                         .padding(horizontal = 12.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
@@ -175,11 +180,7 @@ fun AlphaApp() {
                     onReading = { route = AlphaRoute.PARTS },
                     onClear = { confirmClear = true },
                 )
-                AlphaRoute.PROFILE -> PlaceholderScreen(
-                    title = "Cá nhân",
-                    subtitle = "Phiên DEMO trên thiết bị",
-                    details = "Không cần tài khoản hay mạng. Vào Tiến độ để xóa $totalSelected lựa chọn tạm của phiên này.",
-                )
+                AlphaRoute.PROFILE -> PreviewPrivacy { route = AlphaRoute.PROGRESS }
             }
         }
     }
@@ -287,6 +288,23 @@ private fun PreviewReview(
             enabled = listeningCount + readingCount > 0,
             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
         ) { Text("Xóa lựa chọn tạm") }
+    }
+}
+
+@Composable
+private fun PreviewPrivacy(onProgress: () -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(contentPadding),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        ScreenHeader("Cá nhân")
+        Text("Chính sách quyền riêng tư", style = MaterialTheme.typography.titleLarge)
+        Text("TOEIC Learning Demo hoạt động ngoại tuyến. Ứng dụng không có tài khoản, quảng cáo hoặc phân tích sử dụng. Ứng dụng không thu thập hay chia sẻ dữ liệu cá nhân.")
+        Text("Lựa chọn DEMO chỉ nằm trong bộ nhớ của phiên trên thiết bị này. Khi phiên kết thúc, các lựa chọn bị mất. Bạn có thể xóa ngay trong Tiến độ.")
+        OutlinedButton(
+            onClick = onProgress,
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+        ) { Text("Mở Tiến độ") }
     }
 }
 
