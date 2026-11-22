@@ -12,21 +12,33 @@ android {
         applicationId = "vn.toeiclearning.alpha"
         minSdk = 26
         targetSdk = 36
-        versionCode = 2
-        versionName = "0.2.0-preview"
+        versionCode = 3
+        versionName = "0.2.1-preview"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("boolean", "LOCAL_LISTENING_PREVIEW", "false")
     }
 
     buildTypes {
         release { isMinifyEnabled = false }
+        create("localPreview") {
+            initWith(getByName("debug"))
+            matchingFallbacks += "debug"
+            applicationIdSuffix = ".listeningpreview"
+            versionNameSuffix = "-lab"
+            buildConfigField("boolean", "LOCAL_LISTENING_PREVIEW", "true")
+        }
     }
+    sourceSets.getByName("localPreview").assets.srcDir("../.tooling/fasttrack-handoff/part3-assets")
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
-    buildFeatures { compose = true }
-    androidResources { noCompress += "wav" }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
+    androidResources { noCompress += listOf("wav", "mp3") }
 }
 
 dependencies {

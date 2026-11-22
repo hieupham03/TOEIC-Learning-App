@@ -12,6 +12,12 @@ internal data class ListeningFixture(
     val sha256: String,
 ) {
     val assetPath: String get() = "listening_demo/$audioId.wav"
+    val asset: ListeningAsset get() = ListeningAsset(assetPath, ListeningDemo.TONE_SIZE, sha256)
+}
+
+internal data class ListeningAsset(val path: String, val size: Long, val sha256: String) {
+    fun matches(bytes: ByteArray): Boolean = bytes.size.toLong() == size &&
+        MessageDigest.getInstance("SHA-256").digest(bytes).toHexString() == sha256
 }
 
 internal object ListeningDemo {
@@ -45,9 +51,7 @@ internal object ListeningDemo {
         if (resolve(fixture.part) != fixture || bytes.size.toLong() != TONE_SIZE) {
             return PlaybackEvent.INVALID_ASSET
         }
-        val hash = MessageDigest.getInstance("SHA-256").digest(bytes)
-            .joinToString("") { "%02x".format(it) }
-        return if (hash == fixture.sha256) null else PlaybackEvent.INVALID_ASSET
+        return if (fixture.asset.matches(bytes)) null else PlaybackEvent.INVALID_ASSET
     }
 }
 

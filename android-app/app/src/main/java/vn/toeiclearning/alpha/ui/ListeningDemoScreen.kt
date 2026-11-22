@@ -16,7 +16,11 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -28,6 +32,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import vn.toeiclearning.alpha.BuildConfig
+import vn.toeiclearning.alpha.domain.ListeningAsset
 import vn.toeiclearning.alpha.domain.ListeningDemo
 import vn.toeiclearning.alpha.domain.PlaybackState
 
@@ -37,12 +43,14 @@ private const val DemoNotice = "DEMO · Âm thanh thử nghiệm · Không phả
 internal fun ListeningDemoPicker(onBack: () -> Unit, onPart: (Int) -> Unit) {
     DemoPage {
         ScreenHeader("Listening DEMO", onBack)
-        Notice(DemoNotice)
+        Notice(if (BuildConfig.LOCAL_LISTENING_PREVIEW) "DEMO / CHƯA QA · Part 3 tiếng Anh chỉ dùng kiểm tra cục bộ." else DemoNotice)
         for (part in 1..4) {
             OutlinedButton(
                 onClick = { onPart(part) },
                 modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-            ) { Text("Mở Part $part DEMO") }
+            ) {
+                Text(if (BuildConfig.LOCAL_LISTENING_PREVIEW && part == 3) "Mở Part 3 DEMO tiếng Anh" else "Mở Part $part DEMO")
+            }
         }
     }
 }
@@ -56,22 +64,12 @@ internal fun ListeningDemoItem(
     onPrevious: (() -> Unit)?,
     onNext: () -> Unit,
 ) {
-    val fixture = ListeningDemo.resolve(part)
-    val assets = LocalContext.current.assets
-    val lifecycle = LocalLifecycleOwner.current.lifecycle
-    val playback = remember(assets, part) { LocalListeningPlayer(assets, part) }
-
-    DisposableEffect(lifecycle, playback) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_PAUSE) playback.stop()
-        }
-        lifecycle.addObserver(observer)
-        onDispose {
-            lifecycle.removeObserver(observer)
-            playback.stop()
-        }
+    if (BuildConfig.LOCAL_LISTENING_PREVIEW && part == 3) {
+        SpokenPart3Demo(onBack, onPrevious, onNext)
+        return
     }
 
+    val fixture = ListeningDemo.resolve(part)
     DemoPage {
         ScreenHeader("Part $part · Listening DEMO", onBack, showNotice = false)
         Notice(DemoNotice)
@@ -80,7 +78,7 @@ internal fun ListeningDemoItem(
             return@DemoPage
         }
         Text("Mẫu $part/4 · Mỗi Part có một câu minh họa", style = MaterialTheme.typography.bodyMedium)
-        PlaybackControls(playback)
+        PlaybackControls(rememberListeningPlayer(fixture.asset))
         if (part == 1) Notice("Ô ảnh minh họa Part 1 · chỉ là nội dung giữ chỗ")
         val choice = answers[fixture.itemId]
         Text("Chọn một đáp án mẫu", style = MaterialTheme.typography.titleMedium)
@@ -105,6 +103,64 @@ internal fun ListeningDemoItem(
             ) { Text("Part trước") }
         }
     }
+}
+
+@Composable
+private fun SpokenPart3Demo(onBack: () -> Unit, onPrevious: (() -> Unit)?, onNext: () -> Unit) {
+    val assets = LocalContext.current.assets
+    val group = remember(assets) { readLocalPart3(assets) }
+    var choices by remember { mutableStateOf(emptyMap<String, String>()) }
+    DemoPage {
+        ScreenHeader("Part 3 · Listening tiếng Anh", onBack, showNotice = false)
+        Notice("DEMO / CHƯA QA · Mẫu tiếng Anh cục bộ. Các lựa chọn chỉ giữ trên màn hình này và không chấm điểm.")
+        if (group == null) {
+            Notice("Không tìm thấy dữ liệu nhóm hợp lệ. Không thể phát.", warning = true)
+            return@DemoPage
+        }
+        Text("Một đoạn nghe cho cả ba câu 32–34", style = MaterialTheme.typography.titleMedium)
+        PlaybackControls(rememberListeningPlayer(group.audio))
+        for (item in group.items) {
+            Text("Câu ${item.number}. ${item.prompt}", style = MaterialTheme.typography.titleMedium)
+            for ((index, option) in item.choices.withIndex()) {
+                val letter = ('A' + index).toString()
+                val selected = choices[item.id] == letter
+                OutlinedButton(
+                    onClick = { choices = choices + (item.id to letter) },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                        .semantics { this.selected = selected },
+                ) {
+                    Text("$letter. $option" + if (selected) " · Đã chọn" else "")
+                }
+            }
+        }
+        OutlinedButton(onClick = onNext, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+            Text("Part tiếp theo")
+        }
+        if (onPrevious != null) {
+            OutlinedButton(onClick = onPrevious, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                Text("Part trước")
+            }
+        }
+    }
+}
+
+@Composable
+private fun rememberListeningPlayer(asset: ListeningAsset): LocalListeningPlayer {
+    val assets = LocalContext.current.assets
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val scope = rememberCoroutineScope()
+    val playback = remember(assets, asset, scope) { LocalListeningPlayer(assets, asset, scope) }
+    DisposableEffect(lifecycle, playback) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_PAUSE) playback.stop()
+        }
+        lifecycle.addObserver(observer)
+        onDispose {
+            lifecycle.removeObserver(observer)
+            playback.stop()
+        }
+    }
+    return playback
 }
 
 @Composable

@@ -8,16 +8,26 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import java.io.FileNotFoundException
 import java.io.IOException
-import vn.toeiclearning.alpha.domain.ListeningDemo
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import vn.toeiclearning.alpha.domain.ListeningAsset
 import vn.toeiclearning.alpha.domain.PlaybackEvent
 import vn.toeiclearning.alpha.domain.PlaybackState
 
 /** Owns a single player on the main thread for one foreground DEMO screen. */
-internal class LocalListeningPlayer(private val assets: AssetManager, private val part: Int) {
+internal class LocalListeningPlayer(
+    private val assets: AssetManager,
+    private val asset: ListeningAsset,
+    private val scope: CoroutineScope,
+) {
     var state by mutableStateOf(PlaybackState.IDLE)
         private set
 
     private var player: MediaPlayer? = null
+    private var verification: Job? = null
 
     fun toggle() {
         when (state) {
@@ -31,23 +41,31 @@ internal class LocalListeningPlayer(private val assets: AssetManager, private va
     private fun playFromBeginning() {
         releasePlayer()
         transition(PlaybackEvent.LOAD)
-        val fixture = ListeningDemo.resolve(part)
-        if (fixture == null) {
-            fail(PlaybackEvent.INVALID_ASSET)
-            return
+        verification = scope.launch {
+            val failure = withContext(Dispatchers.IO) { verifyAsset() }
+            if (failure == null) prepare() else fail(failure)
         }
+    }
+
+    private fun verifyAsset(): PlaybackEvent? = try {
+        assets.openFd(asset.path).use { file ->
+            if (file.length == asset.size && assets.open(asset.path).use { asset.matches(it.readBytes()) }) {
+                null
+            } else {
+                PlaybackEvent.INVALID_ASSET
+            }
+        }
+    } catch (_: FileNotFoundException) {
+        PlaybackEvent.MISSING_ASSET
+    } catch (_: IOException) {
+        PlaybackEvent.PLAYER_ERROR
+    } catch (_: RuntimeException) {
+        PlaybackEvent.PLAYER_ERROR
+    }
+
+    private fun prepare() {
         try {
-            // Verify the immutable packaged bytes before preparing the player.
-            assets.openFd(fixture.assetPath).use { asset ->
-                val failure = if (asset.length != ListeningDemo.TONE_SIZE) {
-                    PlaybackEvent.INVALID_ASSET
-                } else {
-                    ListeningDemo.assetFailure(fixture, assets.open(fixture.assetPath).use { it.readBytes() })
-                }
-                if (failure != null) {
-                    fail(failure)
-                    return
-                }
+            assets.openFd(asset.path).use { file ->
                 val pending = MediaPlayer()
                 player = pending
                 pending.setAudioAttributes(
@@ -56,7 +74,7 @@ internal class LocalListeningPlayer(private val assets: AssetManager, private va
                         .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
                         .build(),
                 )
-                pending.setDataSource(asset.fileDescriptor, asset.startOffset, asset.length)
+                pending.setDataSource(file.fileDescriptor, file.startOffset, file.length)
                 pending.setOnPreparedListener { current ->
                     if (player === current && state == PlaybackState.LOADING) {
                         usePlayer(PlaybackEvent.START) { start() }
@@ -84,6 +102,8 @@ internal class LocalListeningPlayer(private val assets: AssetManager, private va
     }
 
     fun stop() {
+        verification?.cancel()
+        verification = null
         releasePlayer()
         transition(PlaybackEvent.STOP)
     }
