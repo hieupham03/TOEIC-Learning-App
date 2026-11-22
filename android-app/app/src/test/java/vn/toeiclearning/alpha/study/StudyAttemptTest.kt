@@ -35,4 +35,22 @@ class StudyAttemptTest {
         assertEquals(3, recommendedPart(setOf(1, 3, 5), listOf(PartStats(1, 0, 0, 3))))
         assertNull(recommendedPart(emptySet(), emptyList()))
     }
+
+    @Test fun evidenceAndReviewMustMatchTheExactItemSnapshotBeforeScoring() {
+        val original = group.items[1]
+        val source = StudyAnswerProof(group.id, original.id, group.source, group.version,
+            studyItemDigest(group, original), 2, "a".repeat(64))
+        val pending = applyStudyAnswer(group, original, source, null)
+        assertTrue(pending.hasSourceKey)
+        assertNull(pending.key)
+        val review = StudyAnswerReview(source, "synthetic reviewer", "synthetic evidence")
+        val eligible = applyStudyAnswer(group, original, source, review)
+        assertEquals(2, eligible.key?.choice)
+        val reordered = original.copy(choices = options.reversed())
+        assertNull(applyStudyAnswer(group, reordered, source, review).key)
+        assertNull(applyStudyAnswer(group.copy(version = "fixture-v2"), original, source, review).key)
+        assertNull(applyStudyAnswer(group, original, source, review.copy(proof = source.copy(choice = 1))).key)
+        assertNull(applyStudyAnswer(group, original, source, review.copy(reviewer = "")).key)
+        assertEquals(2, eligible.key?.choice)
+    }
 }

@@ -1,5 +1,6 @@
 package vn.toeiclearning.alpha.study
 
+import java.security.MessageDigest
 import vn.toeiclearning.alpha.domain.ListeningAsset
 
 internal data class StudyKey(val choice: Int, val evidence: String, val explanation: String? = null) {
@@ -12,11 +13,54 @@ internal data class StudyItem(
     val prompt: String,
     val choices: List<String>,
     val key: StudyKey? = null,
+    val hasSourceKey: Boolean = key != null,
 ) {
     init {
         require(id.isNotBlank() && number > 0 && choices.size in 3..4 && choices.none(String::isBlank))
         require(key == null || key.choice in choices.indices)
     }
+}
+
+internal data class StudyAnswerProof(
+    val groupId: String,
+    val itemId: String,
+    val source: String,
+    val version: String,
+    val itemSha256: String,
+    val choice: Int,
+    val evidenceSha256: String,
+)
+
+internal data class StudyAnswerReview(
+    val proof: StudyAnswerProof,
+    val reviewer: String,
+    val evidence: String,
+    val explanation: String? = null,
+)
+
+internal fun studyItemDigest(group: StudyGroup, item: StudyItem): String {
+    val digest = MessageDigest.getInstance("SHA-256")
+    val fields = listOf(group.id, group.source, group.version, group.part.toString(), item.id,
+        item.number.toString(), item.prompt, group.passage.orEmpty(), group.audio?.sha256.orEmpty(),
+        group.image?.sha256.orEmpty()) + item.choices
+    for (field in fields) {
+        val bytes = field.toByteArray()
+        digest.update("${bytes.size}:".toByteArray())
+        digest.update(bytes)
+    }
+    return digest.digest().joinToString("") { "%02x".format(it) }
+}
+
+internal fun applyStudyAnswer(
+    group: StudyGroup, item: StudyItem, source: StudyAnswerProof?, review: StudyAnswerReview?,
+): StudyItem {
+    if (source == null || source.groupId != group.id || source.itemId != item.id || source.source != group.source ||
+        source.version != group.version || source.choice !in item.choices.indices ||
+        !source.evidenceSha256.matches(Regex("[a-f0-9]{64}")) || source.itemSha256 != studyItemDigest(group, item)
+    ) return item.copy(key = null, hasSourceKey = false)
+    val key = review?.takeIf { it.proof == source && it.reviewer.isNotBlank() && it.evidence.isNotBlank() }
+        ?.let { StudyKey(source.choice, it.evidence, it.explanation) }
+    return item.copy(key = key, hasSourceKey = true)
 }
 
 internal data class StudyGroup(

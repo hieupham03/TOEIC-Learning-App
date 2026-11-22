@@ -211,11 +211,15 @@ internal fun StudyApp() {
                     if (reviews.isEmpty()) Text("Chưa có câu sai đã chấm hoặc câu đánh dấu.")
                     if (dashboard!!.active != null) Notice("Hoàn thành bài đang làm trước khi bắt đầu ôn.")
                     reviews.forEach { row ->
+                        val currentGroup = pack!!.groups.firstOrNull { group ->
+                            group.id == row.group.id && group.items.any { it.id == row.item.id }
+                        }
                         Text("Part ${row.group.part} · Câu ${row.item.number}", style = MaterialTheme.typography.titleMedium)
                         Text(listOfNotNull(if (row.wrong) "Câu sai" else null, if (row.marked) "Đã đánh dấu" else null).joinToString(" · "))
                         Text(row.item.prompt)
-                        StudyButton("Luyện lại câu ${row.item.number}", !busy && dashboard!!.active == null) {
-                            start(listOf(row.group), row.group.items.indexOf(row.item))
+                        if (currentGroup == null) Text("Câu này hiện không có trong ngân hàng luyện tập.")
+                        else StudyButton("Luyện lại câu ${row.item.number}", !busy && dashboard!!.active == null) {
+                            start(listOf(currentGroup), currentGroup.items.indexOfFirst { it.id == row.item.id })
                         }
                         HorizontalDivider()
                     }
@@ -304,7 +308,7 @@ private fun StudyHome(
         val groups = byPart[part].orEmpty()
         val items = groups.flatMap { it.items }
         Text("Part $part · ${if (part <= 4) "Listening" else "Reading"}", style = MaterialTheme.typography.titleMedium)
-        Text("${items.size} câu khả dụng · ${items.count { it.key != null }} có đáp án đã xác minh")
+        Text("${items.size} câu khả dụng · ${items.count { it.hasSourceKey }} có đáp án nguồn · ${items.count { it.key != null }} đã duyệt")
         StudyButton("Luyện Part $part", groups.isNotEmpty() && dashboard.active == null && !busy) { onStart(groups) }
         HorizontalDivider()
     }

@@ -179,11 +179,18 @@ internal fun StudySession(
                     }
                     if (attempt.complete) {
                         val answer = item.key
-                        if (answer != null) Text("Đáp án đã xác minh · ${'A' + answer.choice}")
-                        else Text("Câu này chưa có đáp án đã xác minh.")
+                        if (answer != null) {
+                            Text("Đáp án đã xác minh · ${'A' + answer.choice}")
+                            val selected = attempt.selections[item.id]
+                            Text(when (selected) {
+                                null -> "Bạn chưa trả lời câu này."
+                                answer.choice -> "Bạn trả lời đúng."
+                                else -> "Bạn trả lời sai."
+                            })
+                        } else Text(if (item.hasSourceKey) "Đáp án nguồn đang chờ kiểm duyệt." else "Câu này chưa có đáp án đã xác minh.")
                         Text(answer?.explanation ?: "Chưa có lời giải.")
                     } else {
-                        if (item.key == null) Text("Câu này chưa có đáp án đã xác minh.")
+                        if (item.key == null) Text(if (item.hasSourceKey) "Đáp án nguồn đang chờ kiểm duyệt." else "Câu này chưa có đáp án đã xác minh.")
                         if (mock == null) StudyButton(if (marked) "Bỏ đánh dấu" else "Đánh dấu câu", !busy, onClick = onBookmark)
                     }
                 }

@@ -53,8 +53,8 @@ android {
 androidComponents {
     onVariants(selector().withBuildType("study")) { variant ->
         variant.outputs.forEach {
-            it.versionCode.set(4)
-            it.versionName.set("0.3.0-study")
+            it.versionCode.set(5)
+            it.versionName.set("0.3.1-study")
         }
     }
 }

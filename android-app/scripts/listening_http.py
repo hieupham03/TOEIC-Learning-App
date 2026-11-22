@@ -107,8 +107,12 @@ class Response:
 
 
 class BoundedClient:
-    def __init__(self, *, opener=None, now=time.monotonic, sleep=time.sleep):
+    def __init__(self, *, opener=None, now=time.monotonic, sleep=time.sleep,
+                 max_requests=MAX_REQUESTS, max_bytes=MAX_BYTES):
+        if not 1 <= max_requests <= 80 or not 1 <= max_bytes <= 100 * 1024**2:
+            raise ValueError("Invalid bounded transport budget")
         self.opener = opener if opener is not None else build_opener(ProxyHandler({}), NoRedirect())
+        self.max_requests, self.max_bytes = max_requests, max_bytes
         self.now, self.sleep = now, sleep
         self.requests = 0
         self.downloaded = 0
@@ -197,8 +201,8 @@ class BoundedClient:
 
     def _attempt(self, url, limit, accept, check_robots):
         host = approved_host(url)
-        available = min(limit, MAX_BYTES - self.downloaded)
-        if self.requests >= MAX_REQUESTS or available <= 0:
+        available = min(limit, self.max_bytes - self.downloaded)
+        if self.requests >= self.max_requests or available <= 0:
             raise FetchError("Batch request or byte budget exhausted", blocked=True)
         delay = self.delay.get(host, 3)
         if host in self.last_start:
