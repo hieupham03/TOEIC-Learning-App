@@ -1,3 +1,13 @@
+# LATEST PO OVERRIDE — FIND *GRADABLE* TOEIC CONTENT FROM ALL ACCESSIBLE SOURCES (2026-11-22)
+
+**READ FIRST:** `docs/STAGE05_MULTI_SOURCE_GRADED_CONTENT_PRIORITY_V0.1.md`. The PO explicitly authorizes expanding source *discovery* beyond Zenlish, TheTOEICLab, Study4 and prioritizes complete TOEIC practice sets with an **actual associated answer key** so the two people can study and score accurately. All older source whitelists and batch plans are superseded only regarding sourcing breadth and technical priority. **Faust Academy has publicly indexed 7 Listening and 7 Reading practice papers with claimed separate answer-key PDFs; verify actual downloadable files/media and their match, do not assume.** ETS official sample PDF has a genuinely verified answer key page but is NOT a complete 200-question test. Try multiple attributable source publishers; switch candidates after blocks; no endless request loops. Keep original publisher/category distinct from official ETS.
+
+**New engineering priority:** deliver one genuinely sourced/reviewed/gradable Reading collection + matching audio Listening collection as a private Study APK, then pursue two truly independent 200-item A/B packs with keys/media. Do NOT rename Zenlish choice arrays as answer keys, invent key letters, fake human QA, or substitute search-snippet claims for files. Don't assign another source's keys by *question number alone*. Separate SOURCE_KEY_MATCHED vs ACADEMIC_REVIEWED vs SCORABLE; preserve local history and mock gates.
+
+**Rights workflow:** PO already declares rights handled for their project: no redundant blanket legal loops. However, respect new publishers' applicable access/usage permissions and do not bypass login/CAPTCHA/robots/403/429. Raw copied questions, audio, PDFs, keys and personal data are private locally in ignored dirs, never in public Git. No Play tasks (#8 ON HOLD), cloud/backend, paid services, or formal QA claims. Stable source hashes and source IDs are mandatory for accurate scoring.
+
+---
+
 # NEW HIGHEST-PRIORITY PO DIRECTION — 2-PERSON DAILY STUDY PRODUCT (2026-11-22)
 
 **The PO now prioritizes completing ALL learning features so two people can study smoothly. Google Play work is explicitly POSTPONED.** THIS supersedes old **deadline/priority** text for `FAST-03/04` / Issue #8, *but not signed baseline/QA/data-integrity safeguards*. Working branch: `development/two-user-study-mvp`.
