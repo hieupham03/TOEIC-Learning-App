@@ -5,6 +5,8 @@
 **/local.properties
 android-app/.tooling/
 android-app/.kotlin/
+*.apk
+*.aab
 
 # Local SDK, IDE and operating-system state
 .idea/

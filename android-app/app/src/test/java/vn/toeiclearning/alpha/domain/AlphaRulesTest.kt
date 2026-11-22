@@ -50,4 +50,17 @@ class AlphaRulesTest {
         assertEquals(40, returned.context.itemOffset)
         assertEquals(questions.last().id, returned.context.questionId)
     }
+
+    @Test fun selectionsAndRevealedFeedbackAreIndependentAcrossParts() {
+        val part5 = SyntheticCatalogue.questions(5).first()
+        val part7 = SyntheticCatalogue.questions(7).first()
+        var session = PracticeRules.select(PracticeState(), part5, part5.correctIndex)
+        session = PracticeRules.requestFeedback(session, part5)
+        session = PracticeRules.select(session, part7, part7.correctIndex)
+        assertEquals(setOf(part5.id, part7.id), session.selectedById.keys)
+        assertEquals(setOf(part5.id), session.explanationVisibleFor)
+        assertEquals(session, PracticeRules.select(session, part5, 0))
+        assertTrue(PracticeRules.feedback(session, part5)?.correct == true)
+        assertNull(PracticeRules.feedback(session, part7))
+    }
 }

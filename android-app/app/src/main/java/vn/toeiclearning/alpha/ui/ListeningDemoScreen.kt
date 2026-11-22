@@ -16,10 +16,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -51,12 +48,18 @@ internal fun ListeningDemoPicker(onBack: () -> Unit, onPart: (Int) -> Unit) {
 }
 
 @Composable
-internal fun ListeningDemoItem(part: Int, onBack: () -> Unit) {
+internal fun ListeningDemoItem(
+    part: Int,
+    answers: Map<String, String>,
+    onSelect: (itemId: String, option: String) -> Unit,
+    onBack: () -> Unit,
+    onPrevious: (() -> Unit)?,
+    onNext: () -> Unit,
+) {
     val fixture = ListeningDemo.resolve(part)
     val assets = LocalContext.current.assets
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val playback = remember(assets, part) { LocalListeningPlayer(assets, part) }
-    var choice by remember(part) { mutableStateOf<String?>(null) }
 
     DisposableEffect(lifecycle, playback) {
         val observer = LifecycleEventObserver { _, event ->
@@ -70,27 +73,37 @@ internal fun ListeningDemoItem(part: Int, onBack: () -> Unit) {
     }
 
     DemoPage {
-        ScreenHeader("Part $part · Listening DEMO", onBack)
+        ScreenHeader("Part $part · Listening DEMO", onBack, showNotice = false)
         Notice(DemoNotice)
         if (fixture == null) {
             Notice("Không tìm thấy nhóm thử nghiệm hợp lệ. Không thể phát.", warning = true)
             return@DemoPage
         }
-        Text("Nhóm ${fixture.groupId} · Câu ${fixture.itemId}", style = MaterialTheme.typography.bodyMedium)
-        Text("Tệp ${fixture.audioId}", style = MaterialTheme.typography.bodyMedium)
+        Text("Mẫu $part/4 · Mỗi Part có một câu minh họa", style = MaterialTheme.typography.bodyMedium)
         PlaybackControls(playback)
         if (part == 1) Notice("Ô ảnh minh họa Part 1 · chỉ là nội dung giữ chỗ")
+        val choice = answers[fixture.itemId]
         Text("Chọn một đáp án mẫu", style = MaterialTheme.typography.titleMedium)
         for (option in listOf("A", "B", "C", "D")) {
             OutlinedButton(
-                onClick = { choice = option },
+                onClick = { onSelect(fixture.itemId, option) },
                 modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
                     .semantics { selected = choice == option },
             ) {
                 Text(if (choice == option) "Mẫu $option · Đã chọn" else "Mẫu $option")
             }
         }
-        Text("Lựa chọn thử nghiệm chỉ hiện trên màn hình. Chưa lưu bền vững.")
+        Text("Lựa chọn được giữ trong phiên DEMO. Listening không chấm đúng/sai.")
+        Button(
+            onClick = onNext,
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+        ) { Text(if (part < 4) "Part tiếp theo" else "Xem lại phiên DEMO") }
+        if (onPrevious != null) {
+            OutlinedButton(
+                onClick = onPrevious,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+            ) { Text("Part trước") }
+        }
     }
 }
 

@@ -2,8 +2,8 @@ package vn.toeiclearning.alpha.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -26,6 +27,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -50,6 +52,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import vn.toeiclearning.alpha.domain.PracticeRules
@@ -71,6 +74,10 @@ fun AlphaApp() {
     var route by rememberSaveable { mutableStateOf(AlphaRoute.HOME) }
     var part by rememberSaveable { mutableIntStateOf(5) }
     var listeningPart by rememberSaveable { mutableIntStateOf(1) }
+    var readingAnswers by remember { mutableStateOf(PracticeState()) }
+    var listeningAnswers by remember { mutableStateOf(emptyMap<String, String>()) }
+    var confirmClear by remember { mutableStateOf(false) }
+    val totalSelected = readingAnswers.selectedById.size + listeningAnswers.size
 
     val activeTab = when (route) {
         AlphaRoute.PROGRESS -> AlphaTab.PROGRESS
@@ -92,7 +99,8 @@ fun AlphaApp() {
         bottomBar = {
             Surface(color = AlphaTokens.Surface, shadowElevation = 1.dp) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                    modifier = Modifier.fillMaxWidth().navigationBarsPadding()
+                        .padding(horizontal = 12.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     AlphaTab.entries.forEach { tab ->
@@ -104,7 +112,8 @@ fun AlphaApp() {
                         }
                         TextButton(
                             onClick = { route = target },
-                            modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                            modifier = Modifier.weight(1f).heightIn(min = 48.dp)
+                                .semantics { this.selected = selected },
                             colors = ButtonDefaults.textButtonColors(
                                 contentColor = if (selected) AlphaTokens.Primary else AlphaTokens.Secondary,
                             ),
@@ -136,10 +145,10 @@ fun AlphaApp() {
                     },
                 )
                 AlphaRoute.PRACTICE -> key(part) {
-                    PracticeScreen(part = part, onBack = { route = AlphaRoute.PARTS })
+                    PracticeScreen(part, readingAnswers, { readingAnswers = it }) { route = AlphaRoute.PARTS }
                 }
                 AlphaRoute.READING -> key(part) {
-                    ReadingScreen(part = part, onBack = { route = AlphaRoute.PARTS })
+                    ReadingScreen(part, readingAnswers, { readingAnswers = it }) { route = AlphaRoute.PARTS }
                 }
                 AlphaRoute.LISTENING_DEMO -> ListeningDemoPicker(
                     onBack = { route = AlphaRoute.HOME },
@@ -149,26 +158,50 @@ fun AlphaApp() {
                     },
                 )
                 AlphaRoute.LISTENING_ITEM -> key(listeningPart) {
-                    ListeningDemoItem(listeningPart, onBack = { route = AlphaRoute.LISTENING_DEMO })
+                    ListeningDemoItem(
+                        part = listeningPart,
+                        answers = listeningAnswers,
+                        onSelect = { item, choice -> listeningAnswers = listeningAnswers + (item to choice) },
+                        onBack = { route = AlphaRoute.LISTENING_DEMO },
+                        onPrevious = if (listeningPart > 1) ({ listeningPart-- }) else null,
+                        onNext = if (listeningPart < 4) ({ listeningPart++ }) else ({ route = AlphaRoute.PROGRESS }),
+                    )
                 }
                 AlphaRoute.MOCK_INFO -> MockBlockedScreen(onBack = { route = AlphaRoute.HOME })
-                AlphaRoute.PROGRESS -> PlaceholderScreen(
-                    title = "Tiến độ",
-                    subtitle = "Chưa có kết quả người học",
-                    details = "Alpha chỉ thử nghiệm giao diện bằng dữ liệu giả. Không có lịch sử học, chấm điểm, đồng bộ hoặc tài khoản.",
+                AlphaRoute.PROGRESS -> PreviewReview(
+                    listeningCount = listeningAnswers.size,
+                    readingCount = readingAnswers.selectedById.size,
+                    onListening = { route = AlphaRoute.LISTENING_DEMO },
+                    onReading = { route = AlphaRoute.PARTS },
+                    onClear = { confirmClear = true },
                 )
                 AlphaRoute.PROFILE -> PlaceholderScreen(
                     title = "Cá nhân",
-                    subtitle = "Không thu thập dữ liệu cá nhân",
-                    details = "Alpha chưa có đăng nhập, nơi lưu trữ dữ liệu thực hoặc chức năng xóa dữ liệu. Các nghĩa vụ riêng tư của MVP sẽ được kiểm chứng ở giai đoạn được phê duyệt sau.",
+                    subtitle = "Phiên DEMO trên thiết bị",
+                    details = "Không cần tài khoản hay mạng. Vào Tiến độ để xóa $totalSelected lựa chọn tạm của phiên này.",
                 )
             }
         }
     }
+    if (confirmClear) {
+        AlertDialog(
+            onDismissRequest = { confirmClear = false },
+            title = { Text("Xóa lựa chọn DEMO?") },
+            text = { Text("Các lựa chọn và giải thích đã mở trong phiên này sẽ được đặt lại.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    readingAnswers = PracticeState()
+                    listeningAnswers = emptyMap()
+                    confirmClear = false
+                }) { Text("Xóa lựa chọn") }
+            },
+            dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("Hủy") } },
+        )
+    }
 }
 
 @Composable
-internal fun ScreenHeader(title: String, onBack: (() -> Unit)? = null) {
+internal fun ScreenHeader(title: String, onBack: (() -> Unit)? = null, showNotice: Boolean = true) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (onBack != null) {
             TextButton(onClick = onBack, modifier = Modifier.heightIn(min = 48.dp)) {
@@ -176,8 +209,8 @@ internal fun ScreenHeader(title: String, onBack: (() -> Unit)? = null) {
             }
         }
         Text(title, style = MaterialTheme.typography.headlineMedium)
-        Text(
-            "ALPHA · Nội dung giả lập · Chưa QA học liệu",
+        if (showNotice) Text(
+            "DEMO ngoại tuyến · Nội dung giả lập · Chưa QA học liệu",
             color = AlphaTokens.Secondary,
             style = MaterialTheme.typography.bodyMedium,
         )
@@ -207,23 +240,11 @@ private fun TaskHub(onParts: () -> Unit, onMock: () -> Unit, onListeningDemo: ()
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
         ScreenHeader(title = "Hôm nay học gì?")
-        Text(
-            "Chọn cách học phù hợp. Bản Alpha chưa có dữ liệu tiến độ thật.",
-            color = AlphaTokens.Secondary,
-        )
-        HorizontalDivider()
-        Text("Bắt đầu", style = MaterialTheme.typography.titleLarge)
         ModeCard(
-            title = "Luyện theo Part",
-            description = "Khám phá Part 1–7. Chỉ Part 5–7 có nội dung minh họa trong Alpha.",
-            buttonText = "Xem các Part",
+            title = "Reading DEMO · Part 5–7",
+            description = "Luyện điền câu và đọc đoạn văn. Có giải thích cho câu hỏi mẫu.",
+            buttonText = "Mở Reading DEMO",
             onClick = onParts,
-        )
-        ModeCard(
-            title = "Full Mock A / B",
-            description = "Hai đề B1 bắt buộc, mỗi đề 200 câu. Chưa QA và không thể làm thi thật trong Alpha.",
-            buttonText = "Xem điều kiện mở thi",
-            onClick = onMock,
         )
         ModeCard(
             title = "Listening DEMO · Part 1–4",
@@ -231,7 +252,41 @@ private fun TaskHub(onParts: () -> Unit, onMock: () -> Unit, onListeningDemo: ()
             buttonText = "Mở Listening DEMO",
             onClick = onListeningDemo,
         )
-        Notice("Không có câu hỏi, điểm, thời gian thi hoặc lưu đáp án thật trong bản Alpha này.")
+        ModeCard(
+            title = "Full Mock A / B",
+            description = "Hai đề B1 chưa QA và đang khóa.",
+            buttonText = "Xem điều kiện mở thi",
+            onClick = onMock,
+        )
+    }
+}
+
+@Composable
+private fun PreviewReview(
+    listeningCount: Int,
+    readingCount: Int,
+    onListening: () -> Unit,
+    onReading: () -> Unit,
+    onClear: () -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(contentPadding),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        ScreenHeader("Tiến độ")
+        Notice("Lựa chọn chỉ giữ trong bộ nhớ của phiên trên thiết bị này. Khi mở ứng dụng lại sau khi đóng hẳn, phiên sẽ bắt đầu mới.")
+        ModeCard("Listening · $listeningCount/4 đã chọn", "Các lựa chọn Listening DEMO không được chấm.", "Xem lại Listening", onListening)
+        ModeCard(
+            "Reading · $readingCount/${(5..7).sumOf { SyntheticCatalogue.questions(it).size }} đã chọn",
+            "Mở lại từng Part để xem lựa chọn và giải thích mẫu.",
+            "Xem lại Reading",
+            onReading,
+        )
+        OutlinedButton(
+            onClick = onClear,
+            enabled = listeningCount + readingCount > 0,
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+        ) { Text("Xóa lựa chọn tạm") }
     }
 }
 
@@ -295,34 +350,46 @@ private fun PartPicker(onBack: () -> Unit, onPart: (Int) -> Unit) {
 }
 
 @Composable
-private fun PracticeScreen(part: Int, onBack: () -> Unit) {
+private fun PracticeScreen(
+    part: Int,
+    practice: PracticeState,
+    onPracticeChange: (PracticeState) -> Unit,
+    onBack: () -> Unit,
+) {
     val questions = remember(part) { SyntheticCatalogue.questions(part) }
     var index by rememberSaveable(part) { mutableIntStateOf(0) }
-    var practice by remember(part) { mutableStateOf(PracticeState()) }
     if (part != 5 || questions.isEmpty()) {
         PlaceholderScreen("Chưa có học liệu", "Không thể bắt đầu", "Không có nội dung giả lập hợp lệ cho Part này.")
         return
     }
     val question = questions[index.coerceIn(0, questions.lastIndex)]
+    val scroll = rememberScrollState()
+    LaunchedEffect(index) { scroll.scrollTo(0) }
     Column(
-        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+        modifier = Modifier.fillMaxSize().verticalScroll(scroll)
             .padding(horizontal = contentPadding, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         ScreenHeader("Part 5 · Luyện thử", onBack)
-        Notice("Câu hỏi tự tạo để thử UI, không phải TOEIC thật. Đáp án chỉ được chọn tạm trong bộ nhớ; CHƯA LƯU.")
+        Notice("Lựa chọn được giữ trong bộ nhớ của phiên DEMO.")
         Text("Câu ${index + 1}/${questions.size}", color = AlphaTokens.Secondary)
         QuestionPanel(
             question = question,
             state = practice,
-            onSelect = { choice -> practice = PracticeRules.select(practice, question, choice) },
-            onReveal = { practice = PracticeRules.requestFeedback(practice, question) },
+            onSelect = { choice -> onPracticeChange(PracticeRules.select(practice, question, choice)) },
+            onReveal = { onPracticeChange(PracticeRules.requestFeedback(practice, question)) },
         )
         Button(
             onClick = { index = (index + 1) % questions.size },
             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
         ) {
             Text(if (index == questions.lastIndex) "Xem lại câu đầu" else "Câu tiếp theo")
+        }
+        if (index > 0) {
+            OutlinedButton(
+                onClick = { index-- },
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+            ) { Text("Câu trước") }
         }
     }
 }
@@ -336,7 +403,7 @@ private fun QuestionPanel(
 ) {
     val selection = state.selectedById[question.id]
     val feedback = PracticeRules.feedback(state, question)
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(modifier = Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(question.prompt, style = MaterialTheme.typography.titleMedium)
         question.choices.forEachIndexed { index, choice ->
             Surface(
@@ -388,7 +455,12 @@ private fun QuestionPanel(
 }
 
 @Composable
-private fun ReadingScreen(part: Int, onBack: () -> Unit) {
+private fun ReadingScreen(
+    part: Int,
+    answers: PracticeState,
+    onAnswersChange: (PracticeState) -> Unit,
+    onBack: () -> Unit,
+) {
     val passage = remember(part) { SyntheticCatalogue.passage(part) }
     val questions = remember(part) { SyntheticCatalogue.questions(part) }
     if (part !in 6..7 || passage == null || questions.isEmpty()) {
@@ -399,7 +471,6 @@ private fun ReadingScreen(part: Int, onBack: () -> Unit) {
     var session by remember(part) {
         mutableStateOf(ReadingSession(ReadingPane.PASSAGE, ReadingContext(passage.id, questions.first().id)))
     }
-    var answers by remember(part) { mutableStateOf(PracticeState()) }
     val passageScroll = rememberLazyListState()
 
     BackHandler(enabled = session.pane == ReadingPane.QUESTIONS) { session = session.returnToPassage() }
@@ -425,8 +496,7 @@ private fun ReadingScreen(part: Int, onBack: () -> Unit) {
                 modifier = Modifier.fillMaxWidth().padding(horizontal = readingGutter, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                ScreenHeader("Part $part · Reading", onBack)
-                Notice("Vị trí đọc chỉ được giữ trong màn hình này.")
+                ScreenHeader("Part $part · Reading", onBack, showNotice = false)
                 if (session.pane == ReadingPane.PASSAGE) {
                     Button(
                         onClick = {
@@ -460,7 +530,12 @@ private fun ReadingScreen(part: Int, onBack: () -> Unit) {
                     ),
                     verticalArrangement = Arrangement.spacedBy(18.dp),
                 ) {
-                    item { Text(passage.title, style = MaterialTheme.typography.titleMedium) }
+                    item {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Notice("Đoạn văn giả lập · Chưa QA học liệu. Vị trí đọc chỉ được giữ trong màn hình này.")
+                            Text(passage.title, style = MaterialTheme.typography.titleMedium)
+                        }
+                    }
                     itemsIndexed(
                         items = passage.paragraphs,
                         key = { index, _ -> "${passage.id}-$index" },
@@ -470,12 +545,16 @@ private fun ReadingScreen(part: Int, onBack: () -> Unit) {
                 }
             } else {
                 val chosen = questions.firstOrNull { it.id == session.context.questionId } ?: questions.first()
+                val questionIndex = questions.indexOf(chosen)
+                val questionScroll = rememberScrollState()
+                LaunchedEffect(chosen.id) { questionScroll.scrollTo(0) }
                 Column(
-                    modifier = Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState())
+                    modifier = Modifier.fillMaxWidth().weight(1f).verticalScroll(questionScroll)
                         .padding(horizontal = readingGutter, vertical = 10.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    Text("Câu hỏi gắn với đoạn: ${passage.title}", color = AlphaTokens.Secondary)
+                    Text("Câu ${questionIndex + 1}/${questions.size} · Nội dung giả lập · Chưa QA", color = AlphaTokens.Secondary)
+                    Text(passage.title, style = MaterialTheme.typography.titleMedium)
                     LazyRow(
                         modifier = Modifier.fillMaxWidth()
                             .semantics { contentDescription = "Chọn câu hỏi gắn với đoạn văn" },
@@ -501,9 +580,21 @@ private fun ReadingScreen(part: Int, onBack: () -> Unit) {
                     QuestionPanel(
                         question = chosen,
                         state = answers,
-                        onSelect = { i -> answers = PracticeRules.select(answers, chosen, i) },
-                        onReveal = { answers = PracticeRules.requestFeedback(answers, chosen) },
+                        onSelect = { i -> onAnswersChange(PracticeRules.select(answers, chosen, i)) },
+                        onReveal = { onAnswersChange(PracticeRules.requestFeedback(answers, chosen)) },
                     )
+                    if (questionIndex < questions.lastIndex) {
+                        Button(
+                            onClick = { session = session.selectQuestion(questions[questionIndex + 1]) },
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                        ) { Text("Câu tiếp theo") }
+                    }
+                    if (questionIndex > 0) {
+                        OutlinedButton(
+                            onClick = { session = session.selectQuestion(questions[questionIndex - 1]) },
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                        ) { Text("Câu trước") }
+                    }
                     OutlinedButton(
                         onClick = { session = session.returnToPassage() },
                         modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
