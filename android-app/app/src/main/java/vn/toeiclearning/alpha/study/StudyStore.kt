@@ -70,11 +70,12 @@ internal class StudyStore(context: Context) : SQLiteOpenHelper(
         readableDatabase.rawQuery("SELECT * FROM attempts WHERE id=?", arrayOf(id.toString()))
             .use { if (it.moveToFirst()) decodeAttempt(it) else null }
 
-    fun save(attempt: StudyAttempt, day: String): StudyAttempt = transaction { db ->
+    fun save(attempt: StudyAttempt, day: String, updateSnapshot: Boolean = false): StudyAttempt = transaction { db ->
         val next = attempt.copy(revision = attempt.revision + 1)
         val values = ContentValues().apply {
             put("revision", next.revision)
             put("state", encodeState(next))
+            if (updateSnapshot) put("snapshot", JSONArray(next.groups.map(::writeStudyGroup)).toString())
             next.finishedAt?.let { ended ->
                 val score = next.score()
                 put("ended", ended)

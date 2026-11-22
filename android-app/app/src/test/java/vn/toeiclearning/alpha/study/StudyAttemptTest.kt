@@ -71,4 +71,37 @@ class StudyAttemptTest {
         assertEquals(1, StudyAttempt(listOf(revoked)).select(2).finish(1000).score().ungraded)
         assertEquals(1, historical.score().correct)
     }
+
+    @Test fun applyingAContentUpdateRevokesInFlightKeysWithoutRescoringHistory() {
+        val open = StudyAttempt(listOf(group)).select(0).move(2).select(0)
+            .copy(readingOffsets = mapOf(group.id to 20))
+        val unreviewed = group.items[0].copy(key = null)
+        val current = group.copy(items = listOf(unreviewed, group.items[1], group.items[2]))
+        val resumed = open.retainCurrentPracticeKeys(listOf(current))
+        assertEquals(open.selections, resumed.selections)
+        assertEquals(open.position, resumed.position)
+        assertEquals(open.readingOffsets, resumed.readingOffsets)
+        assertTrue(resumed.items[0].hasSourceKey)
+        assertEquals(StudyScore(3, 2, 1, 1), resumed.finish(2000).score())
+        assertTrue(resumed.finish(2000).mistakes().isEmpty())
+        assertEquals(resumed, resumed.retainCurrentPracticeKeys(listOf(group)))
+        val history = open.finish(1000)
+        assertEquals(history, history.retainCurrentPracticeKeys(emptyList()))
+        assertEquals(StudyScore(3, 2, 2, 1), history.score())
+    }
+
+    @Test fun resumingDropsKeysForMissingOrAlteredEvidenceAndNeverAddsNewKeys() {
+        val open = StudyAttempt(listOf(group)).select(1)
+        val replaced = group.copy(items = listOf(
+            group.items[0].copy(choices = options.reversed()),
+            group.items[1].copy(key = StudyKey(0, "New approval"), hasSourceKey = true),
+            group.items[2].copy(key = StudyKey(2, "New approval")),
+        ))
+        val resumed = open.retainCurrentPracticeKeys(listOf(replaced))
+        assertTrue(resumed.items.none { it.key != null })
+        assertEquals(options, resumed.items[0].choices)
+        assertFalse(resumed.items[0].hasSourceKey)
+        assertTrue(open.retainCurrentPracticeKeys(emptyList()).items.none { it.hasSourceKey })
+        assertEquals(open, open.retainCurrentPracticeKeys(listOf(group)))
+    }
 }

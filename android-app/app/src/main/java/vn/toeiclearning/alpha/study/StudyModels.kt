@@ -123,6 +123,25 @@ internal data class StudyAttempt(
     fun finish(at: Long, interrupted: Boolean = false): StudyAttempt =
         if (complete) this else copy(finishedAt = at, interrupted = interrupted)
 
+    fun retainCurrentPracticeKeys(currentGroups: List<StudyGroup>): StudyAttempt {
+        if (complete || mock != null || items.none { it.hasSourceKey }) return this
+        val currentById = currentGroups.associateBy { it.id }
+        return copy(groups = groups.map { savedGroup ->
+            val currentGroup = currentById[savedGroup.id]
+            savedGroup.copy(items = savedGroup.items.map item@{ savedItem ->
+                if (!savedItem.hasSourceKey) return@item savedItem
+                val currentItem = currentGroup?.items?.firstOrNull { it.id == savedItem.id }?.takeIf {
+                    studyItemDigest(currentGroup, it) == studyItemDigest(savedGroup, savedItem)
+                }
+                val savedKey = savedItem.key
+                savedItem.copy(
+                    key = currentItem?.key?.takeIf { savedKey != null && it.choice == savedKey.choice && it.evidence == savedKey.evidence },
+                    hasSourceKey = currentItem?.hasSourceKey == true,
+                )
+            })
+        })
+    }
+
     fun score(part: Int? = null): StudyScore {
         val scoped = if (part == null) items else groups.filter { it.part == part }.flatMap { it.items }
         val attempted = scoped.filter { it.id in selections }

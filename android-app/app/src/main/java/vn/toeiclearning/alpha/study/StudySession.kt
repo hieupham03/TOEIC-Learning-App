@@ -52,6 +52,8 @@ import vn.toeiclearning.alpha.ui.Notice
 import vn.toeiclearning.alpha.ui.PlaybackControls
 import vn.toeiclearning.alpha.ui.rememberListeningPlayer
 
+private const val SOURCE_KEY_UNGRADED = "Có đáp án nguồn · câu này chưa chấm."
+
 @Composable
 internal fun StudySession(
     attempt: StudyAttempt,
@@ -176,8 +178,12 @@ internal fun StudySession(
                                 answer.choice -> "Bạn trả lời đúng."
                                 else -> "Bạn trả lời sai."
                             })
-                        } else Text(if (item.hasSourceKey) "Đáp án nguồn đang chờ kiểm duyệt." else "Câu này chưa có đáp án đã xác minh.")
-                    }
+                        } else Text(if (item.hasSourceKey) SOURCE_KEY_UNGRADED else "Câu này chưa có đáp án đã xác minh.")
+                    } else Text(when {
+                        item.key != null -> "Đã kiểm duyệt · chấm khi kết thúc bài."
+                        item.hasSourceKey -> SOURCE_KEY_UNGRADED
+                        else -> "Câu này chưa có đáp án đã xác minh."
+                    })
                     key(group.id, group.version) {
                         group.audio?.let {
                             if (mock == null) PlaybackControls(rememberListeningPlayer(it), study = true)
@@ -201,7 +207,6 @@ internal fun StudySession(
                     if (attempt.complete) {
                         Text(item.key?.explanation ?: "Chưa có lời giải.")
                     } else {
-                        if (item.key == null) Text(if (item.hasSourceKey) "Đáp án nguồn đang chờ kiểm duyệt." else "Câu này chưa có đáp án đã xác minh.")
                         if (mock == null) StudyButton(if (marked) "Bỏ đánh dấu" else "Đánh dấu câu", !busy, onClick = onBookmark)
                     }
                 }

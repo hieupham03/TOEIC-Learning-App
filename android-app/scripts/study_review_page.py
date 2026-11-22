@@ -72,6 +72,7 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; margin: .5r
     <legend>Quyết định kiểm duyệt</legend>
     <label for="file">Tệp nguồn đáp án cục bộ</label><input id="file" type="file">
     <p id="digest" class="meta" aria-live="polite">Chọn tài liệu gốc đã đối chiếu.</p>
+    <p id="expected" class="meta" aria-live="polite"></p>
     <label>URL nguồn tài liệu<input id="evidenceUrl" type="url"></label>
     <div class="line"><label>Người duyệt<input id="reviewer" maxlength="100"></label><label>Ngày đối chiếu<input id="reviewedAt" type="date"></label></div>
     <div class="line"><label>Đáp án nguồn<select id="label"></select></label><label>Trang / dòng / ô<input id="locator" maxlength="240"></label></div>
@@ -97,6 +98,16 @@ const value = id => byId(id).value.trim();
 function options(node, entries) {
   node.replaceChildren(...entries.map(([label, value]) => new Option(label, value)));
 }
+function showEvidenceMatch() {
+  const candidate = shown[position]?.queue?.candidate;
+  const expected = byId('expected');
+  expected.textContent = candidate ? 'SHA-256 dự kiến ' + candidate.evidenceSha256 : '';
+  if (candidate && evidenceSha256) {
+    expected.textContent = candidate.evidenceSha256 === evidenceSha256
+      ? 'SHA-256 tệp đã chọn khớp với câu này.'
+      : 'Tệp đã chọn khác bằng chứng của câu này. ' + expected.textContent;
+  }
+}
 function show() {
   const row = shown[position], state = row && (drafts.get(row.id) || row.review || row.queue);
   const candidate = row?.queue?.candidate;
@@ -104,8 +115,10 @@ function show() {
   byId('state').textContent = states[state?.status] || '';
   byId('prompt').textContent = row?.prompt || '';
   byId('passage').textContent = row?.passage || '';
-  const fields = row ? [row.itemId, row.groupId, row.source, row.version, row.itemSha256] : [];
-  if (candidate) fields.push(candidate.evidenceUrl, candidate.evidenceSha256, candidate.locator);
+  const fields = row ? ['Câu ' + row.itemId, 'Nhóm ' + row.groupId, 'Nguồn đề ' + row.source,
+    'SHA-256 phiên bản ' + row.version, 'SHA-256 câu ' + row.itemSha256] : [];
+  if (candidate) fields.push('Nguồn khóa ' + candidate.evidenceUrl, 'SHA-256 khóa ' + candidate.evidenceSha256,
+    'Vị trí khóa ' + candidate.locator);
   byId('meta').textContent = fields.join('\n');
   const media = byId('media');
   media.replaceChildren();
@@ -130,6 +143,7 @@ function show() {
   byId('explanationLocator').value = state?.explanationLocator || '';
   byId('status').value = 'SOURCE_ONLY';
   byId('confirm').checked = false;
+  showEvidenceMatch();
   byId('save').disabled = !row;
   byId('prev').disabled = !row || position < 1; byId('next').disabled = position >= shown.length - 1;
 }
@@ -149,12 +163,14 @@ byId('next').onclick = () => move(position + 1);
 byId('file').onchange = async () => {
   const input = byId('file'), file = input.files[0], digest = byId('digest');
   evidenceSha256 = '';
+  showEvidenceMatch();
   if (!file || file.size < 1 || file.size > 12 * 1024 * 1024) { digest.textContent = 'Tệp phải từ 1 byte đến 12 MiB.'; return; }
   try {
     const bytes = new Uint8Array(await crypto.subtle.digest('SHA-256', await file.arrayBuffer()));
     if (input.files[0] !== file) return;
     evidenceSha256 = Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
     digest.textContent = file.name + ' · SHA-256 ' + evidenceSha256;
+    showEvidenceMatch();
   } catch { digest.textContent = 'Không đọc được SHA-256 trong trình duyệt này. Mở tệp bằng Edge hoặc Chrome.'; }
 };
 byId('save').onclick = () => {
@@ -195,6 +211,7 @@ byId('download').onclick = () => {
 byId('reviewedAt').value = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 byId('coverage').textContent = rows.length + ' câu · ' + rows.filter(row => row.sourceKey).length +
   ' có đáp án nguồn · ' + rows.filter(row => row.key).length + ' đã duyệt';
+byId('pendingKeys').checked = rows.some(row => row.queue?.status === 'AWAITING_REVIEW');
 filter();
 </script>
 </body>

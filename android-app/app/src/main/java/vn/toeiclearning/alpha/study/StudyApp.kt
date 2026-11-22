@@ -105,15 +105,19 @@ internal fun StudyApp() {
             page = StudyPage.SESSION
         }
 
-    fun continueAttempt(id: Long) = runLocal({
-        val previous = checkNotNull(store.attempt(id))
-        val checked = previous.advanceMock(mockTime(), recovering = true)
-        (if (previous == checked) previous else store.save(checked, day())) to store.dashboard(day())
-    }) { (saved, stats) ->
-        session = saved
-        dashboard = stats
-        clock = mockTime()
-        page = StudyPage.SESSION
+    fun continueAttempt(id: Long) {
+        val currentGroups = pack?.groups.orEmpty()
+        runLocal({
+            val previous = checkNotNull(store.attempt(id))
+            val checked = previous.retainCurrentPracticeKeys(currentGroups).advanceMock(mockTime(), recovering = true)
+            (if (previous == checked) previous else store.save(checked, day(), updateSnapshot = previous.groups != checked.groups)) to
+                store.dashboard(day())
+        }) { (saved, stats) ->
+            session = saved
+            dashboard = stats
+            clock = mockTime()
+            page = StudyPage.SESSION
+        }
     }
 
     fun saveAttempt(next: StudyAttempt) = runLocal({
