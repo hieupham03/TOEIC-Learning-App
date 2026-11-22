@@ -27,7 +27,7 @@ internal fun loadStudyPack(assets: AssetManager): StudyPack = runCatching {
     fun verifiedGroup(row: JSONObject): StudyGroup? =
         runCatching { readStudyGroup(row, requireAnswerProof = true).also { group ->
             require(group.source.startsWith("https://"))
-            for (asset in listOfNotNull(group.audio, group.image)) {
+            for (asset in listOfNotNull(group.audio) + group.images) {
                 require(verified.getOrPut(asset) { verifyMedia(assets, asset) })
             }
         } }.getOrNull()
@@ -35,7 +35,7 @@ internal fun loadStudyPack(assets: AssetManager): StudyPack = runCatching {
     require(groups.map { it.id }.distinct().size == groups.size)
     val ids = groups.flatMap { it.items }.map { it.id }
     require(ids.distinct().size == ids.size)
-    val media = groups.flatMap { listOfNotNull(it.audio?.sha256, it.image?.sha256) }
+    val media = groups.flatMap { group -> (listOfNotNull(group.audio) + group.images).map { it.sha256 } }
     require(media.distinct().size == media.size)
     val forms = runCatching {
         root.optJSONArray("forms")?.objects().orEmpty().map { form ->
@@ -73,13 +73,15 @@ internal fun readStudyGroup(row: JSONObject, requireAnswerProof: Boolean = false
     }
     val audio = readAsset(row, "audio", "mp3")
     val image = readAsset(row, "image", "png|jpg")
+    val extraImages = row.optJSONArray("extraImages")?.objects().orEmpty().map { parseAsset(it, "png|jpg") }
     val passage = row.optString("passage").takeUnless { row.isNull("passage") || it.isBlank() }
     require(items.all { it.choices.size == if (part == 2) 3 else 4 })
     require((part in 1..4) == (audio != null))
     require(part != 1 || image != null)
     require(part !in 6..7 || image != null || passage != null)
     if (audio != null) require(row.getJSONArray("audioItems").strings() == items.map { it.id })
-    val group = StudyGroup(row.getString("id"), part, row.getString("version"), items, row.getString("source"), passage, audio, image)
+    val group = StudyGroup(row.getString("id"), part, row.getString("version"), items,
+        row.getString("source"), passage, audio, image, extraImages)
     if (!requireAnswerProof) return group
     return group.copy(items = items.zip(itemRows).map { (item, itemRow) ->
         val sourceProof = itemRow.optJSONObject("sourceKey")?.answerProof()
@@ -97,14 +99,16 @@ private fun JSONObject.answerProof(): StudyAnswerProof? = runCatching {
 }.getOrNull()
 
 private fun readAsset(row: JSONObject, name: String, extensions: String): ListeningAsset? =
-    row.optJSONObject(name)?.let { media ->
-        val sha = media.getString("sha256")
-        val path = media.getString("path")
-        val size = media.getLong("size")
-        require(sha.matches(Regex("[a-f0-9]{64}")) && size in 1..12_582_912)
-        require(path.matches(Regex("study_pack/media/$sha\\.($extensions)")))
-        ListeningAsset(path, size, sha)
-    }
+    row.optJSONObject(name)?.let { parseAsset(it, extensions) }
+
+private fun parseAsset(media: JSONObject, extensions: String): ListeningAsset {
+    val sha = media.getString("sha256")
+    val path = media.getString("path")
+    val size = media.getLong("size")
+    require(sha.matches(Regex("[a-f0-9]{64}")) && size in 1..12_582_912)
+    require(path.matches(Regex("study_pack/media/$sha\\.($extensions)")))
+    return ListeningAsset(path, size, sha)
+}
 
 internal fun writeStudyGroup(group: StudyGroup): JSONObject {
     val items = group.items.map { item ->
@@ -124,6 +128,7 @@ internal fun writeStudyGroup(group: StudyGroup): JSONObject {
                 put("audioItems", JSONArray(group.items.map { item -> item.id }))
             }
             group.image?.let { put("image", writeAsset(it)) }
+            if (group.extraImages.isNotEmpty()) put("extraImages", JSONArray(group.extraImages.map(::writeAsset)))
         }
 }
 

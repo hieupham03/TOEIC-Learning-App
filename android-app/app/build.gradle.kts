@@ -37,7 +37,8 @@ android {
         }
     }
     sourceSets.getByName("localPreview").assets.srcDir("../.tooling/fasttrack-handoff/part3-assets")
-    sourceSets.getByName("study").assets.srcDir("../.tooling/two-user-study/assets")
+    val studyAssets = providers.gradleProperty("studyAssetsDir").orElse("../.tooling/two-user-study/content-02/assets")
+    sourceSets.getByName("study").assets.srcDir(studyAssets.get())
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -53,8 +54,8 @@ android {
 androidComponents {
     onVariants(selector().withBuildType("study")) { variant ->
         variant.outputs.forEach {
-            it.versionCode.set(5)
-            it.versionName.set("0.3.1-study")
+            it.versionCode.set(6)
+            it.versionName.set("0.3.2-study")
         }
     }
 }

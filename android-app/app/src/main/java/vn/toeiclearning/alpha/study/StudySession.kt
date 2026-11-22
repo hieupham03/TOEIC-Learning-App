@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -92,6 +93,14 @@ internal fun StudySession(
     }
     val hasPassage = group.part >= 6
     var showPassage by remember(attempt.id, group.id) { mutableStateOf(hasPassage && !attempt.complete) }
+    val questionStrip = rememberLazyListState()
+    LaunchedEffect(attempt.position, allowed.firstOrNull(), showPassage, attempt.complete) {
+        val index = allowed.indexOf(attempt.position)
+        if ((!showPassage || attempt.complete) && index >= 0 &&
+            questionStrip.layoutInfo.visibleItemsInfo.none { it.index == index }) {
+            questionStrip.scrollToItem(index)
+        }
+    }
     var confirmFinish by remember(attempt.id) { mutableStateOf(false) }
     val passageScroll = key(attempt.id, group.id) {
         rememberScrollState(attempt.readingOffsets[group.id] ?: 0)
@@ -133,7 +142,7 @@ internal fun StudySession(
                     Text("Đoạn văn · câu ${group.items.first().number}–${group.items.last().number}",
                         style = MaterialTheme.typography.titleMedium)
                     group.passage?.let { Text(it, style = MaterialTheme.typography.bodyLarge) }
-                    group.image?.let { StudyImage(it, "Ảnh đoạn văn", allowZoom = true) }
+                    StudyImages(group)
                 }
             } else {
                 Column(Modifier.fillMaxWidth().weight(1f).verticalScroll(key(attempt.id, item.id, attempt.complete) { rememberScrollState() }),
@@ -144,7 +153,7 @@ internal fun StudySession(
                         Text(if (score.graded == 0) "Chưa có câu đã chấm bằng đáp án xác minh."
                         else "${score.correct} đúng · ${score.wrong} sai · ${score.ungraded} đã trả lời chưa chấm")
                     }
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    LazyRow(state = questionStrip, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(allowed) { index ->
                             val target = attempt.items[index]
                             val answered = target.id in attempt.selections
@@ -155,15 +164,24 @@ internal fun StudySession(
                             ) { Text("${target.number}${if (answered) " ✓" else ""}") }
                         }
                     }
+                    if (attempt.complete) {
+                        val answer = item.key
+                        if (answer != null) {
+                            Text("Đáp án đã xác minh · ${'A' + answer.choice}")
+                            Text(when (attempt.selections[item.id]) {
+                                null -> "Bạn chưa trả lời câu này."
+                                answer.choice -> "Bạn trả lời đúng."
+                                else -> "Bạn trả lời sai."
+                            })
+                        } else Text(if (item.hasSourceKey) "Đáp án nguồn đang chờ kiểm duyệt." else "Câu này chưa có đáp án đã xác minh.")
+                    }
                     key(group.id, group.version) {
                         group.audio?.let {
                             if (mock == null) PlaybackControls(rememberListeningPlayer(it), study = true)
                             else if (phase == MockPhase.LISTENING) MockAudio(attempt, it, busy, onChange)
                         }
                     }
-                    if (!hasPassage || attempt.complete) {
-                        group.image?.let { StudyImage(it, if (hasPassage) "Ảnh đoạn văn" else "Ảnh câu hỏi", allowZoom = hasPassage) }
-                    }
+                    if (!hasPassage || attempt.complete) StudyImages(group)
                     if (attempt.complete) group.passage?.let { Text(it, style = MaterialTheme.typography.bodyLarge) }
                     Text("Câu ${item.number}${if (item.prompt.isBlank()) "" else " · ${item.prompt}"}",
                         style = MaterialTheme.typography.titleMedium)
@@ -178,17 +196,7 @@ internal fun StudySession(
                         else "$option. $choice${if (chosen) " · Đã chọn" else ""}") }
                     }
                     if (attempt.complete) {
-                        val answer = item.key
-                        if (answer != null) {
-                            Text("Đáp án đã xác minh · ${'A' + answer.choice}")
-                            val selected = attempt.selections[item.id]
-                            Text(when (selected) {
-                                null -> "Bạn chưa trả lời câu này."
-                                answer.choice -> "Bạn trả lời đúng."
-                                else -> "Bạn trả lời sai."
-                            })
-                        } else Text(if (item.hasSourceKey) "Đáp án nguồn đang chờ kiểm duyệt." else "Câu này chưa có đáp án đã xác minh.")
-                        Text(answer?.explanation ?: "Chưa có lời giải.")
+                        Text(item.key?.explanation ?: "Chưa có lời giải.")
                     } else {
                         if (item.key == null) Text(if (item.hasSourceKey) "Đáp án nguồn đang chờ kiểm duyệt." else "Câu này chưa có đáp án đã xác minh.")
                         if (mock == null) StudyButton(if (marked) "Bỏ đánh dấu" else "Đánh dấu câu", !busy, onClick = onBookmark)
@@ -261,7 +269,17 @@ private fun MockAudio(attempt: StudyAttempt, asset: ListeningAsset, busy: Boolea
 }
 
 @Composable
-private fun StudyImage(asset: ListeningAsset, description: String, allowZoom: Boolean) {
+private fun StudyImages(group: StudyGroup) {
+    val images = group.images
+    val name = if (group.part >= 6) "Ảnh đoạn văn" else "Ảnh câu hỏi"
+    images.forEachIndexed { index, asset ->
+        val description = if (images.size == 1) name else "$name ${index + 1}/${images.size}"
+        key(asset.path) { StudyImage(asset, description) }
+    }
+}
+
+@Composable
+private fun StudyImage(asset: ListeningAsset, description: String) {
     val assets = LocalContext.current.assets
     val image by produceState<Pair<Boolean, Bitmap?>>(false to null, asset, assets) {
         value = false to null
@@ -275,7 +293,7 @@ private fun StudyImage(asset: ListeningAsset, description: String, allowZoom: Bo
     }
     var zoomed by remember(asset) { mutableStateOf(false) }
     image.second?.let { picture ->
-        if (allowZoom) StudyButton(if (zoomed) "Thu ảnh" else "Phóng ảnh đoạn văn") { zoomed = !zoomed }
+        StudyButton(if (zoomed) "Thu ${description.lowercase()}" else "Phóng ${description.lowercase()}") { zoomed = !zoomed }
         val size = if (zoomed) Modifier.horizontalScroll(rememberScrollState()).width(650.dp) else Modifier.fillMaxWidth()
         Image(picture.asImageBitmap(), description, size.aspectRatio(picture.width.toFloat() / picture.height))
     } ?: Text(if (image.first) "Ảnh không khả dụng." else "Đang mở ảnh…")

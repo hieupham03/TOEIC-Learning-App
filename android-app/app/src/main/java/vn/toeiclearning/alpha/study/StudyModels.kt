@@ -43,7 +43,8 @@ internal fun studyItemDigest(group: StudyGroup, item: StudyItem): String {
     val fields = listOf(group.id, group.source, group.version, group.part.toString(), item.id,
         item.number.toString(), item.prompt, group.passage.orEmpty(), group.audio?.sha256.orEmpty(),
         group.image?.sha256.orEmpty()) + item.choices
-    for (field in fields) {
+    val imageFields = if (group.extraImages.isEmpty()) emptyList() else listOf("extraImages") + group.extraImages.map { it.sha256 }
+    for (field in fields + imageFields) {
         val bytes = field.toByteArray()
         digest.update("${bytes.size}:".toByteArray())
         digest.update(bytes)
@@ -72,11 +73,15 @@ internal data class StudyGroup(
     val passage: String? = null,
     val audio: ListeningAsset? = null,
     val image: ListeningAsset? = null,
+    val extraImages: List<ListeningAsset> = emptyList(),
 ) {
+    val images get() = listOfNotNull(image) + extraImages
+
     init {
         require(id.isNotBlank() && part in 1..7 && version.isNotBlank() && source.isNotBlank())
         require(items.isNotEmpty() && items.map { it.id }.distinct().size == items.size)
         require(items.zipWithNext().all { (a, b) -> b.number > a.number })
+        require(extraImages.size <= 3 && (extraImages.isEmpty() || image != null))
     }
 }
 

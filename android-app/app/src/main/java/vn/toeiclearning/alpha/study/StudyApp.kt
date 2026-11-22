@@ -309,7 +309,13 @@ private fun StudyHome(
         val items = groups.flatMap { it.items }
         Text("Part $part · ${if (part <= 4) "Listening" else "Reading"}", style = MaterialTheme.typography.titleMedium)
         Text("${items.size} câu khả dụng · ${items.count { it.hasSourceKey }} có đáp án nguồn · ${items.count { it.key != null }} đã duyệt")
-        StudyButton("Luyện Part $part", groups.isNotEmpty() && dashboard.active == null && !busy) { onStart(groups) }
+        if (items.size <= 200) {
+            StudyButton("Luyện Part $part", groups.isNotEmpty() && dashboard.active == null && !busy) { onStart(groups) }
+        } else {
+            groups.chunked(40).forEachIndexed { index, batch ->
+                StudyButton("Luyện Part $part · lượt ${index + 1}", dashboard.active == null && !busy) { onStart(batch) }
+            }
+        }
         HorizontalDivider()
     }
     StudyButton("Full Mock A / B", !busy, onClick = onMock)

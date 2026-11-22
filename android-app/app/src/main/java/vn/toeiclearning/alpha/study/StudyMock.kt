@@ -35,7 +35,7 @@ internal fun checkMockForms(forms: List<MockForm>, practice: List<StudyGroup>): 
         group.items.map { item ->
             val content = (listOf(item.prompt) + item.choices).joinToString("\u0000").normalized()
             val context = if (group.part <= 4) group.audio?.sha256 else
-                (group.passage.orEmpty() + group.image?.sha256.orEmpty()).normalized()
+                (group.passage.orEmpty() + group.images.joinToString("") { it.sha256 }).normalized()
             "$context\u0000$content"
         }
     }

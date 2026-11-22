@@ -5,6 +5,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import vn.toeiclearning.alpha.domain.ListeningAsset
 
 class StudyAttemptTest {
     private val options = listOf("One", "Two", "Three", "Four")
@@ -52,5 +53,22 @@ class StudyAttemptTest {
         assertNull(applyStudyAnswer(group, original, source, review.copy(proof = source.copy(choice = 1))).key)
         assertNull(applyStudyAnswer(group, original, source, review.copy(reviewer = "")).key)
         assertEquals(2, eligible.key?.choice)
+    }
+
+    @Test fun imageOrderAndRevocationAffectNewAttemptsWithoutRescoringHistory() {
+        val item = group.items[1]
+        val original = group.copy(items = listOf(item), image = ListeningAsset("one.png", 100, "1".repeat(64)),
+            extraImages = listOf(ListeningAsset("two.png", 100, "2".repeat(64)), ListeningAsset("three.png", 100, "3".repeat(64))))
+        val proof = StudyAnswerProof(original.id, item.id, original.source, original.version,
+            studyItemDigest(original, item), 2, "a".repeat(64))
+        val review = StudyAnswerReview(proof, "synthetic reviewer", "synthetic evidence")
+        val reviewed = original.copy(items = listOf(applyStudyAnswer(original, item, proof, review)))
+        val historical = StudyAttempt(listOf(reviewed)).select(2).finish(1000)
+        assertEquals(1, historical.score().correct)
+        val imageOrderChanged = original.copy(extraImages = original.extraImages.reversed())
+        assertNull(applyStudyAnswer(imageOrderChanged, item, proof, review).key)
+        val revoked = original.copy(items = listOf(applyStudyAnswer(original, item, proof, null)))
+        assertEquals(1, StudyAttempt(listOf(revoked)).select(2).finish(1000).score().ungraded)
+        assertEquals(1, historical.score().correct)
     }
 }

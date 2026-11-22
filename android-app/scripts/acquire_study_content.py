@@ -54,6 +54,13 @@ def source_asset(url):
 
 
 def parse_candidate(record):
+    part, questions, passage, audio, images = parse_study_record(record)
+    if len(images) > 1 or (images and part not in {1, 6, 7}):
+        raise ValueError("Unsupported image group")
+    return part, questions, passage, audio, next(iter(images), None)
+
+
+def parse_study_record(record):
     sub = record.get("sub_questions")
     if not isinstance(sub, list) or not sub or any(not isinstance(q, dict) for q in sub):
         raise ValueError("Missing source questions")
@@ -85,18 +92,24 @@ def parse_candidate(record):
         raise ValueError("Reading group points to audio")
     questions = normalize_questions(record, PAGE, part=part, indices=tuple(numbers))
     markup = html.unescape(record.get("content") or "")
-    photo_urls = {source_asset(q["image_source_url"]) for q in questions if q["image_source_url"]}
-    for element in (markup, *(html.unescape(q.get("title") or "") for q in sub)):
-        parser = PageMarkup()
-        parser.feed(element)
-        photo_urls.update(source_asset(src) for src in parser.images)
-    if len(photo_urls) > 1 or (photo_urls and part not in {1, 6, 7}) or (part == 1 and not photo_urls):
+    parser = PageMarkup()
+    parser.feed(markup)
+    photo_urls = [source_asset(src) for src in parser.images]
+    for question, raw in zip(questions, sub):
+        inline = PageMarkup()
+        inline.feed(html.unescape(raw.get("title") or ""))
+        if question["image_source_url"]:
+            inline.images.append(question["image_source_url"])
+        if inline.images and len(sub) != 1:
+            raise ValueError("Question-specific image cannot be mapped as a group image")
+        photo_urls.extend(source_asset(src) for src in inline.images)
+    images = tuple(dict.fromkeys(photo_urls))
+    if len(images) > 4 or (images and part not in {1, 3, 4, 6, 7}) or (part == 1 and len(images) != 1):
         raise ValueError("Missing required image or unsupported image group")
     passage = plain_text(markup) or None
-    image = next(iter(photo_urls), None)
-    if part in (6, 7) and not (image or passage):
+    if part in (6, 7) and not (images or passage):
         raise ValueError("Missing Reading passage")
-    return part, questions, passage if part in (6, 7) else None, audio, image
+    return part, questions, passage if part in (6, 7) else None, audio, images
 
 
 def fetch_asset(client, url, media, kind):

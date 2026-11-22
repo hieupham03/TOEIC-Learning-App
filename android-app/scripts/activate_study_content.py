@@ -5,7 +5,7 @@ from hashlib import sha256
 from pathlib import Path
 import re
 
-from acquire_study_content import BATCH, parse_candidate, snapshot_groups, write_json
+from acquire_study_content import BATCH, parse_study_record, snapshot_groups, write_json
 from listening_http import MAX_MEDIA, approved_host
 from listening_manifest import read_json
 from listening_media import inspect_media
@@ -18,6 +18,8 @@ def item_binding(group, item):
     fields = [group["id"], group["source"], group["version"], str(group["part"]),
               item["id"], str(item["number"]), item["prompt"], group.get("passage") or "",
               *((group.get(kind) or {}).get("sha256", "") for kind in ("audio", "image")), *item["choices"]]
+    if group.get("extraImages"):
+        fields += ["extraImages", *(asset["sha256"] for asset in group["extraImages"])]
     digest = sha256()
     for field in fields:
         raw = field.encode("utf-8")
@@ -39,13 +41,13 @@ def nonempty(value):
     return isinstance(value, str) and bool(value.strip())
 
 
-def valid_source(row, binding, labels, evidence_dir, cache):
+def valid_source(row, binding, labels, evidence_dir, cache, source_host=approved_host):
     digest = row.get("evidenceSha256")
     if (any(row.get(field) != value for field, value in binding.items()) or row.get("label") not in labels
             or not isinstance(digest, str) or not SHA.fullmatch(digest) or not nonempty(row.get("locator"))):
         return False
     try:
-        if approved_host(row.get("evidenceUrl", "")) != approved_host(binding["source"]):
+        if source_host(row.get("evidenceUrl", "")) != source_host(binding["source"]):
             return False
         if digest not in cache:
             path = evidence_dir / f"{digest}.bin"
@@ -56,13 +58,13 @@ def valid_source(row, binding, labels, evidence_dir, cache):
         return False
 
 
-def activate_groups(groups, candidates, reviews, evidence_dir, withdrawn_ids):
+def activate_groups(groups, candidates, reviews, evidence_dir, withdrawn_ids, *, source_host=approved_host):
     source_rows, review_rows = by_item(candidates), by_item(reviews)
     group_ids = [group["id"] for group in groups]
     item_ids = [item["id"] for group in groups for item in group["items"]]
     if len(set(group_ids)) != len(group_ids) or len(set(item_ids)) != len(item_ids):
         raise ValueError("Duplicate Study group or item ID")
-    media = [group[kind]["sha256"] for group in groups for kind in ("audio", "image") if group.get(kind)]
+    media = [asset["sha256"] for group in groups for _, asset in group_assets(group)]
     if len(set(media)) != len(media):
         raise ValueError("Duplicate Study media")
     if withdrawn_ids - set(group_ids):
@@ -79,7 +81,7 @@ def activate_groups(groups, candidates, reviews, evidence_dir, withdrawn_ids):
             source = source_rows.get(item["id"], [])
             review = review_rows.get(item["id"], [])
             status = "SOURCE_EVIDENCE_REQUIRED"
-            if len(source) == 1 and valid_source(source[0], binding, choices, evidence_dir, cache):
+            if len(source) == 1 and valid_source(source[0], binding, choices, evidence_dir, cache, source_host):
                 candidate = source[0]
                 label = candidate["label"]
                 choice = choices.index(label)
@@ -95,7 +97,9 @@ def activate_groups(groups, candidates, reviews, evidence_dir, withdrawn_ids):
                                    "evidence": f'{candidate["evidenceUrl"]}#{candidate["locator"]}'}
                     if nonempty(approval.get("explanation")) and nonempty(approval.get("explanationLocator")):
                         item["key"]["explanation"] = approval["explanation"]
-                elif review:
+                elif len(review) == 1 and review[0].get("status") == "REVOKED":
+                    status = "REVOKED"
+                elif review and review[0].get("status") != "SOURCE_ONLY":
                     status = "REVIEW_REJECTED_OR_MISMATCH"
             elif source:
                 status = "SOURCE_EVIDENCE_REJECTED"
@@ -116,7 +120,7 @@ def source_keys(groups, snapshot, evidence_dir):
         if group["version"] != version or record is None:
             continue
         try:
-            part, questions, *_ = parse_candidate(record)
+            part, questions, *_ = parse_study_record(record)
         except ValueError:
             continue
         if part != group["part"] or project_items(questions) != group["items"]:
@@ -131,11 +135,14 @@ def source_keys(groups, snapshot, evidence_dir):
     return rows
 
 
+def group_assets(group):
+    yield from ((kind, group[kind]) for kind in ("audio", "image") if group.get(kind))
+    yield from (("image", asset) for asset in group.get("extraImages", ()))
+
+
 def verify_media(group, old_media, new_media):
-    for kind, formats in (("audio", ("mp3",)), ("image", ("png", "jpeg"))):
-        asset = group.get(kind)
-        if not asset:
-            continue
+    for kind, asset in group_assets(group):
+        formats = ("mp3",) if kind == "audio" else ("png", "jpeg")
         name = Path(asset["path"]).name
         path = new_media / name
         if not path.is_file():
