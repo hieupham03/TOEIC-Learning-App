@@ -50,6 +50,15 @@ android {
     androidResources { noCompress += listOf("wav", "mp3") }
 }
 
+androidComponents {
+    onVariants(selector().withBuildType("study")) { variant ->
+        variant.outputs.forEach {
+            it.versionCode.set(4)
+            it.versionName.set("0.3.0-study")
+        }
+    }
+}
+
 dependencies {
     // 2025.06.00 keeps Compose compatible with the approved API 36 / AGP 8.13 Alpha toolchain.
     implementation(platform("androidx.compose:compose-bom:2025.06.00"))

@@ -1,5 +1,7 @@
 package vn.toeiclearning.alpha.study
 
+import android.os.SystemClock
+import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -43,6 +45,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import vn.toeiclearning.alpha.ui.AlphaTokens
@@ -63,7 +66,12 @@ internal fun StudyApp() {
     var error by remember { mutableStateOf<String?>(null) }
     var clearDialog by remember { mutableStateOf(false) }
     var goalInput by remember { mutableStateOf("") }
-    val day = LocalDate.now().toString()
+    fun day() = LocalDate.now().toString()
+    fun mockTime() = MockTime(
+        Settings.Global.getInt(context.contentResolver, Settings.Global.BOOT_COUNT, -1),
+        SystemClock.elapsedRealtime(), System.currentTimeMillis(),
+    )
+    var clock by remember { mutableStateOf(mockTime()) }
 
     fun <T> runLocal(action: () -> T, update: (T) -> Unit) {
         if (busy) return
@@ -83,26 +91,49 @@ internal fun StudyApp() {
         }
     }
 
-    fun refresh(destination: StudyPage = page) = runLocal({ store.dashboard(day) }) {
+    fun refresh(destination: StudyPage = page) = runLocal({ store.dashboard(day()) }) {
         dashboard = it
         page = destination
         if (goalInput.isBlank()) goalInput = it.goal.toString()
     }
 
     fun start(groups: List<StudyGroup>, position: Int = 0) =
-        runLocal({ store.start(groups, position) to store.dashboard(day) }) { (attempt, stats) ->
+        runLocal({ store.start(groups, position) to store.dashboard(day()) }) { (attempt, stats) ->
             session = attempt
             dashboard = stats
             page = StudyPage.SESSION
         }
 
-    fun continueAttempt(id: Long) = runLocal({ checkNotNull(store.attempt(id)) }) {
-        session = it
+    fun continueAttempt(id: Long) = runLocal({
+        val previous = checkNotNull(store.attempt(id))
+        val checked = previous.advanceMock(mockTime(), recovering = true)
+        (if (previous == checked) previous else store.save(checked, day())) to store.dashboard(day())
+    }) { (saved, stats) ->
+        session = saved
+        dashboard = stats
+        clock = mockTime()
         page = StudyPage.SESSION
     }
 
+    fun saveAttempt(next: StudyAttempt) = runLocal({
+        store.save(next, day()) to if (next.complete) store.dashboard(day()) else null
+    }) { (saved, fresh) ->
+        session = saved
+        if (fresh != null) dashboard = fresh
+    }
+
+    LaunchedEffect(page, session?.id) {
+        while (page == StudyPage.SESSION && session?.mock != null && session?.complete == false) {
+            val attempt = checkNotNull(session)
+            clock = mockTime()
+            val advanced = attempt.advanceMock(clock)
+            if (advanced != attempt) saveAttempt(advanced)
+            delay(500)
+        }
+    }
+
     LaunchedEffect(store) {
-        runLocal({ loadStudyPack(context.assets) to store.dashboard(day) }) { (newPack, stats) ->
+        runLocal({ loadStudyPack(context.assets) to store.dashboard(day()) }) { (newPack, stats) ->
             pack = newPack
             dashboard = stats
             goalInput = stats.goal.toString()
@@ -133,7 +164,7 @@ internal fun StudyApp() {
                     StudyHeading("Học tập trên thiết bị")
                     Text(if (busy) "Đang mở dữ liệu…" else "Không mở được dữ liệu.")
                     if (!busy) StudyButton("Thử lại") {
-                        runLocal({ loadStudyPack(context.assets) to store.dashboard(day) }) { (p, d) ->
+                        runLocal({ loadStudyPack(context.assets) to store.dashboard(day()) }) { (p, d) ->
                             pack = p
                             dashboard = d
                             goalInput = d.goal.toString()
@@ -148,19 +179,29 @@ internal fun StudyApp() {
                     StudySession(
                         attempt, busy,
                         marked = dashboard!!.reviews.any { it.item.id == attempt.item.id && it.marked },
+                        clock = clock,
                         onChange = { next ->
                             if (attempt.complete) session = next
-                            else runLocal({ store.save(next, day) to if (next.complete) store.dashboard(day) else null }) { (saved, fresh) ->
-                                session = saved
-                                if (fresh != null) dashboard = fresh
+                            else if (attempt.mock == null) saveAttempt(next)
+                            else {
+                                val currentTime = mockTime()
+                                val advanced = attempt.advanceMock(currentTime)
+                                val sameSection = (next.group.part <= 4) ==
+                                    (attempt.mock.phase(currentTime) == MockPhase.LISTENING)
+                                if (advanced != attempt) saveAttempt(advanced)
+                                else if (sameSection || next.complete) saveAttempt(next)
                             }
                         },
                         onBookmark = {
-                            runLocal({ store.toggleBookmark(attempt.group, attempt.item.id); store.dashboard(day) }) {
+                            runLocal({ store.toggleBookmark(attempt.group, attempt.item.id); store.dashboard(day()) }) {
                                 dashboard = it
                             }
                         },
-                        onBack = { refresh(StudyPage.HOME) },
+                        onBack = {
+                            if (!attempt.complete && attempt.mock?.pendingAudio != null) {
+                                saveAttempt(attempt.finish(System.currentTimeMillis(), interrupted = true))
+                            } else refresh(StudyPage.HOME)
+                        },
                     )
                 }
                 StudyPage.HISTORY -> StudyHistoryPage(dashboard!!, busy, ::continueAttempt) { page = StudyPage.REVIEW }
@@ -186,13 +227,38 @@ internal fun StudyApp() {
                         label = { Text("Mục tiêu mỗi ngày (số câu)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                     val goal = goalInput.toIntOrNull()
                     StudyButton("Lưu mục tiêu", !busy && goal != null && goal in 1..200) {
-                        runLocal({ store.setGoal(checkNotNull(goal)); store.dashboard(day) }) { dashboard = it }
+                        runLocal({ store.setGoal(checkNotNull(goal)); store.dashboard(day()) }) { dashboard = it }
                     }
                     StudyButton("Xóa dữ liệu học tập", !busy) { clearDialog = true }
                 }
                 StudyPage.MOCK -> StudyPageContent {
                     StudyHeading("Full Mock A / B", onBack = { page = StudyPage.HOME })
-                    Notice("Đang khóa. Thiếu 200 câu đã kiểm chứng ở đề A và 200 ở đề B.", warning = true)
+                    val current = checkNotNull(pack)
+                    if (!current.mocks.ready) {
+                        Notice("Full Mock đang khóa.", warning = true)
+                        for ((id, missing) in current.mocks.missing) Text("Đề $id · thiếu $missing/200 câu đã kiểm chứng")
+                        current.mocks.issues.forEach { Text(it) }
+                    } else {
+                        Text("Mỗi đề 200 câu · 45 phút Listening và 75 phút Reading. Thời gian tính trên thiết bị.")
+                        Text("Audio theo thứ tự và phát một lần. Gián đoạn khi đang phát sẽ kết thúc bài và giữ lựa chọn.")
+                        if (dashboard!!.active != null) Text("Hoàn thành bài đang làm trước khi bắt đầu đề khác.")
+                        current.forms.sortedBy { it.id }.forEach { form ->
+                            StudyButton("Bắt đầu đề ${form.id}", dashboard!!.active == null && !busy) {
+                                val time = mockTime()
+                                if (time.boot < 0) error = "Thiết bị không cung cấp mốc khởi động. Chưa thể bắt đầu đề."
+                                else runLocal({
+                                    val run = MockRun(form.id, form.version, time.boot, time.elapsed)
+                                    val started = store.start(form.groups, mock = run)
+                                    started to store.dashboard(day())
+                                }) { (attempt, stats) ->
+                                    session = attempt
+                                    dashboard = stats
+                                    clock = time
+                                    page = StudyPage.SESSION
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -204,7 +270,7 @@ internal fun StudyApp() {
         confirmButton = {
             TextButton(onClick = {
                 clearDialog = false
-                runLocal({ store.clear(); store.dashboard(day) }) {
+                runLocal({ store.clear(); store.dashboard(day()) }) {
                     dashboard = it
                     session = null
                     goalInput = it.goal.toString()
@@ -226,11 +292,12 @@ private fun StudyHome(
     val suggestion = recommendedPart(byPart.keys, dashboard.stats)
     if (suggestion != null) {
         val reason = if (dashboard.stats.any { it.part in byPart && it.wrong > 0 }) "tỷ lệ đúng thấp trong các Part đã chấm"
-        else "Part đầu tiên có học liệu"
+        else "Part khả dụng có ít câu đã luyện nhất"
         Text("Gợi ý Part $suggestion · $reason")
     }
     dashboard.active?.let {
-        StudyButton("Tiếp tục Part ${it.group.part} · Câu ${it.item.number}", !busy, primary = true) { onResume(it.id) }
+        val title = it.mock?.let { run -> "đề ${run.form}" } ?: "Part ${it.group.part}"
+        StudyButton("Tiếp tục $title · Câu ${it.item.number}", !busy, primary = true) { onResume(it.id) }
     }
     if (pack.unavailable || pack.skipped > 0) Notice("Một phần học liệu chưa mở được. Hãy kiểm tra gói nội dung.", warning = true)
     (1..7).forEach { part ->
@@ -259,7 +326,8 @@ private fun StudyHistoryPage(dashboard: StudyDashboard, busy: Boolean, onOpen: (
         dashboard.history.forEach { item ->
             val date = Instant.ofEpochMilli(item.endedAt).atZone(ZoneId.systemDefault())
                 .format(DateTimeFormatter.ofPattern("dd/MM HH:mm"))
-            StudyButton("Part ${item.part} · $date · ${item.score.attempted}/${item.score.total} đã trả lời", !busy) { onOpen(item.id) }
+            val title = if (item.part == 0) "Full Mock" else "Part ${item.part}"
+            StudyButton("$title · $date · ${item.score.attempted}/${item.score.total} đã trả lời", !busy) { onOpen(item.id) }
         }
     }
 

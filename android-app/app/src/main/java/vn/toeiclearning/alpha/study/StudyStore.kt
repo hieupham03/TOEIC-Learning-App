@@ -21,6 +21,10 @@ internal data class StudyDashboard(
 )
 
 internal class StudyStore(context: Context) : SQLiteOpenHelper(context, "phone-study.db", null, 1) {
+    override fun onConfigure(db: SQLiteDatabase) {
+        db.rawQuery("PRAGMA secure_delete=ON", null).use { it.moveToFirst() }
+    }
+
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL("""CREATE TABLE attempts(
                 id INTEGER PRIMARY KEY, revision INTEGER NOT NULL DEFAULT 0,
@@ -40,8 +44,8 @@ internal class StudyStore(context: Context) : SQLiteOpenHelper(context, "phone-s
         throw SQLiteException("Unsupported study storage migration $oldVersion to $newVersion")
     }
 
-    fun start(groups: List<StudyGroup>, position: Int = 0): StudyAttempt {
-        val attempt = StudyAttempt(groups, position = position)
+    fun start(groups: List<StudyGroup>, position: Int = 0, mock: MockRun? = null): StudyAttempt {
+        val attempt = StudyAttempt(groups, position = position, mock = mock)
         val snapshot = JSONArray(groups.map(::writeStudyGroup)).toString()
         require(snapshot.toByteArray().size <= 750_000)
         val values = ContentValues().apply {
@@ -78,7 +82,7 @@ internal class StudyStore(context: Context) : SQLiteOpenHelper(context, "phone-s
         val changed = db.update("attempts", values, "id=? AND revision=? AND ended IS NULL",
             arrayOf(attempt.id.toString(), attempt.revision.toString()))
         check(changed == 1) { "Study session has changed" }
-        if (next.complete && !next.interrupted) {
+        if (next.complete && next.mock == null) {
             for (group in next.groups) for (item in group.items) {
                 val given = next.selections[item.id] ?: continue
                 val key = item.key ?: continue
@@ -114,8 +118,8 @@ internal class StudyStore(context: Context) : SQLiteOpenHelper(context, "phone-s
             )) }
         }
         val stats = db.rawQuery(
-            "SELECT part,SUM(graded),SUM(correct) FROM attempts WHERE ended IS NOT NULL AND part BETWEEN 1 AND 7 GROUP BY part", null,
-        ).use { c -> buildList { while (c.moveToNext()) add(PartStats(c.getInt(0), c.getInt(1), c.getInt(2))) } }
+            "SELECT part,SUM(graded),SUM(correct),SUM(attempted) FROM attempts WHERE ended IS NOT NULL AND part BETWEEN 1 AND 7 GROUP BY part", null,
+        ).use { c -> buildList { while (c.moveToNext()) add(PartStats(c.getInt(0), c.getInt(1), c.getInt(2), c.getInt(3))) } }
         val today = db.rawQuery("SELECT COALESCE(SUM(attempted),0) FROM attempts WHERE day=?", arrayOf(day))
             .use { it.moveToFirst(); it.getInt(0) }
         val goal = db.rawQuery("SELECT value FROM settings WHERE name='daily_goal'", null)
@@ -183,12 +187,24 @@ internal class StudyStore(context: Context) : SQLiteOpenHelper(context, "phone-s
             readingOffsets = decodeMap(state.getJSONObject("readingOffsets")),
             finishedAt = if (c.isNull(ended)) null else c.getLong(ended),
             interrupted = state.getBoolean("interrupted"),
+            mock = state.optJSONObject("mock")?.let { run ->
+                val played = run.getJSONArray("played")
+                MockRun(run.getString("form"), run.getString("version"), run.getInt("boot"), run.getLong("started"),
+                    (0 until played.length()).map { played.getString(it) }.toSet(),
+                    run.optString("pending").ifBlank { null })
+            },
         )
     }
 
     private fun encodeState(attempt: StudyAttempt): String = JSONObject().put("position", attempt.position)
         .put("selections", JSONObject(attempt.selections)).put("readingOffsets", JSONObject(attempt.readingOffsets))
-        .put("interrupted", attempt.interrupted).toString()
+        .put("interrupted", attempt.interrupted).apply {
+            attempt.mock?.let { run ->
+                put("mock", JSONObject().put("form", run.form).put("version", run.version)
+                    .put("boot", run.boot).put("started", run.started).put("played", JSONArray(run.played))
+                    .put("pending", run.pendingAudio))
+            }
+        }.toString()
 
     private fun decodeMap(value: JSONObject): Map<String, Int> = value.keys().asSequence().associateWith(value::getInt)
 }

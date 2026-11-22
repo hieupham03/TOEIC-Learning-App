@@ -6,7 +6,14 @@ import org.json.JSONArray
 import org.json.JSONObject
 import vn.toeiclearning.alpha.domain.ListeningAsset
 
-internal data class StudyPack(val groups: List<StudyGroup>, val skipped: Int = 0, val unavailable: Boolean = false)
+internal data class StudyPack(
+    val groups: List<StudyGroup>,
+    val skipped: Int = 0,
+    val unavailable: Boolean = false,
+    val forms: List<MockForm> = emptyList(),
+) {
+    val mocks = checkMockForms(forms, groups)
+}
 
 internal fun loadStudyPack(assets: AssetManager): StudyPack = runCatching {
     val root = assets.open("study_pack/pack.json").bufferedReader().use {
@@ -17,17 +24,26 @@ internal fun loadStudyPack(assets: AssetManager): StudyPack = runCatching {
     require(root.getInt("schema") == 1)
     val rows = root.getJSONArray("practice").objects()
     val verified = mutableMapOf<ListeningAsset, Boolean>()
-    val groups = rows.mapNotNull { row ->
+    fun verifiedGroup(row: JSONObject): StudyGroup? =
         runCatching { readStudyGroup(row).also { group ->
+            require(group.source.startsWith("https://"))
             for (asset in listOfNotNull(group.audio, group.image)) {
                 require(verified.getOrPut(asset) { verifyMedia(assets, asset) })
             }
         } }.getOrNull()
-    }
+    val groups = rows.mapNotNull(::verifiedGroup)
     require(groups.map { it.id }.distinct().size == groups.size)
     val ids = groups.flatMap { it.items }.map { it.id }
     require(ids.distinct().size == ids.size)
-    StudyPack(groups, rows.size - groups.size)
+    val forms = runCatching {
+        root.optJSONArray("forms")?.objects().orEmpty().map { form ->
+            val review = form.optJSONObject("review")
+            val evidence = if (review?.optString("status") == "APPROVED") review.optString("evidence") else ""
+            MockForm(form.getString("id"), form.getString("version"), evidence,
+                form.getJSONArray("groups").objects().mapNotNull(::verifiedGroup))
+        }
+    }.getOrDefault(emptyList())
+    StudyPack(groups, rows.size - groups.size, forms = forms)
 }.getOrElse { StudyPack(emptyList(), unavailable = true) }
 
 private fun verifyMedia(assets: AssetManager, asset: ListeningAsset): Boolean = runCatching {

@@ -29,4 +29,10 @@ class StudyAttemptTest {
         assertTrue(final.complete)
         assertFalse(final.interrupted)
     }
+
+    @Test fun suggestionUsesWeakestGradedPartOrLeastAttemptedAvailablePart() {
+        assertEquals(3, recommendedPart(setOf(1, 3, 5), listOf(PartStats(1, 2, 1), PartStats(3, 4, 1))))
+        assertEquals(3, recommendedPart(setOf(1, 3, 5), listOf(PartStats(1, 0, 0, 3))))
+        assertNull(recommendedPart(emptySet(), emptyList()))
+    }
 }

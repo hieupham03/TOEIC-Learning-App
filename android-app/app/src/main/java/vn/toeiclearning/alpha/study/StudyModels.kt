@@ -50,6 +50,7 @@ internal data class StudyAttempt(
     val readingOffsets: Map<String, Int> = emptyMap(),
     val finishedAt: Long? = null,
     val interrupted: Boolean = false,
+    val mock: MockRun? = null,
 ) {
     val items = groups.flatMap { it.items }
     val item get() = items[position]
@@ -88,7 +89,7 @@ internal data class StudyAttempt(
     }
 }
 
-internal data class PartStats(val part: Int, val graded: Int, val correct: Int) {
+internal data class PartStats(val part: Int, val graded: Int, val correct: Int, val attempted: Int = graded) {
     val wrong get() = graded - correct
     val accuracy get() = if (graded == 0) null else correct.toDouble() / graded
 }
@@ -96,4 +97,4 @@ internal data class PartStats(val part: Int, val graded: Int, val correct: Int) 
 internal fun recommendedPart(available: Set<Int>, stats: List<PartStats>): Int? =
     stats.filter { it.part in available && it.graded > 0 && it.wrong > 0 }
         .minWithOrNull(compareBy<PartStats> { it.accuracy }.thenByDescending { it.wrong }.thenBy { it.part })?.part
-        ?: available.minOrNull()
+        ?: available.minWithOrNull(compareBy<Int> { part -> stats.firstOrNull { it.part == part }?.attempted ?: 0 }.thenBy { it })
