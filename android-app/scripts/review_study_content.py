@@ -176,6 +176,42 @@ def review_rows(rows, groups, evidence, *, strict=True):
     return accepted
 
 
+def key_request_rows(groups, queue):
+    """Project the pending queue into form rows bound to the current pack."""
+    pending = {item["id"]: (group, item) for group in groups for item in group["items"] if not item.get("key")}
+    ids = [row["itemId"] for row in queue]
+    if len(ids) != len(set(ids)) or set(ids) != pending.keys():
+        raise ValueError("Review queue does not match the pending items in the Study pack")
+    requests = []
+    for row in queue:
+        group, item = pending[row["itemId"]]
+        binding = item_binding(group, item)
+        if (any(row.get(field) != value for field, value in binding.items())
+                or row.get("part") != group["part"] or row.get("number") != item["number"]):
+            raise ValueError("Review queue contains a stale question binding")
+        requests.append({
+            **binding, "part": group["part"], "number": item["number"], "orderedChoices": item["choices"],
+            "queueStatus": row["status"], "status": "SOURCE_ONLY", "label": "", "evidenceUrl": group["source"],
+            "evidenceSha256": "", "locator": "", "reviewer": "", "reviewedAt": "",
+        })
+    return sorted(requests, key=lambda row: (row["part"], row["source"], row["version"], row["number"], row["itemId"]))
+
+
+def export_key_request(source=ROOT02, destination=ROOT02.parent / "content-03" / "key-request"):
+    pack_path = source / "assets/study_pack/pack.json"
+    digest = sha256(pack_path.read_bytes()).hexdigest()
+    if digest != read_json(source / "activation.json")["pack_sha256"]:
+        raise ValueError("Study pack differs from its activation receipt")
+    pack = read_json(pack_path)
+    rows = key_request_rows(pack["practice"], read_json(source / "answer-review-queue.json"))
+    reading = [row for row in rows if row["part"] >= 5]
+    listening = [row for row in rows if row["part"] < 5]
+    destination.mkdir(parents=True, exist_ok=True)
+    save_json(destination / "01-reading-key-request.json", reading)
+    save_json(destination / "02-listening-key-request.json", listening)
+    return {"pack_sha256": digest, "reading": len(reading), "listening": len(listening)}
+
+
 def assemble(directory=ROOT02, *, review_file=None, evidence_files=()):
     base = seed_previous(directory)
     groups = base["practice"] + read_json(directory / "new-groups.json")
@@ -249,5 +285,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--import-review", type=Path)
     parser.add_argument("--evidence", action="append", type=Path, default=[], help="Attach original local evidence file")
+    parser.add_argument("--export-key-request", action="store_true", help="Export pending Reading and Listening rows without rebuilding")
     args = parser.parse_args()
-    print(json.dumps(assemble(review_file=args.import_review, evidence_files=args.evidence), ensure_ascii=False))
+    if args.export_key_request:
+        if args.import_review or args.evidence:
+            parser.error("Export and evidence import are separate operations")
+        report = export_key_request()
+    else:
+        report = assemble(review_file=args.import_review, evidence_files=args.evidence)
+    print(json.dumps(report, ensure_ascii=False))

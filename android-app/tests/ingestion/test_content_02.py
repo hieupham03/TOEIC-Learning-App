@@ -9,8 +9,9 @@ from test_listening_manifest import png
 from activate_study_content import activate_groups, item_binding
 from acquire_study_content import parse_study_record, write_json
 from extend_study_content import ReceiptClient
+from listening_manifest import read_json
 from prepare_study_pack import package_media
-from review_study_content import check_disjoint, owner_groups, review_rows, source_host
+from review_study_content import check_disjoint, export_key_request, key_request_rows, owner_groups, review_rows, source_host
 from study_review_page import render_review
 
 SOURCE_URL = "https://publisher.invalid/workbook"
@@ -143,6 +144,52 @@ class Content02Tests(unittest.TestCase):
             client = ReceiptClient(ledger)
             self.assertEqual((2, 100), (client.requests, client.downloaded))
             self.assertEqual("HTTP 429 — source stopped", client.stop_reason)
+
+    def test_key_request_export_keeps_exact_binding_and_separates_reading_from_listening(self):
+        with TemporaryDirectory() as work:
+            root = Path(work)
+            reading = reading_group()
+            listening = {**reading_group(), "part": 2, "id": "second", "items": [
+                {"id": "listening-item", "number": 10, "prompt": "", "choices": ["A", "B", "C"]}]}
+            groups = [listening, reading]
+            queue = [{**item_binding(group, group["items"][0]), "part": group["part"],
+                      "number": group["items"][0]["number"], "status": "SOURCE_EVIDENCE_REQUIRED"} for group in groups]
+            pack = root / "assets/study_pack/pack.json"
+            pack.parent.mkdir(parents=True)
+            write_json(pack, {"schema": 1, "practice": groups})
+            original = pack.read_bytes()
+            write_json(root / "activation.json", {"pack_sha256": sha256(original).hexdigest()})
+            write_json(root / "answer-review-queue.json", queue)
+            result = export_key_request(root, root / "request")
+            self.assertEqual((1, 1), (result["reading"], result["listening"]))
+            for part, name in ((5, "01-reading-key-request.json"), (2, "02-listening-key-request.json")):
+                path = root / "request" / name
+                row = next(row for row in key_request_rows(groups, queue) if row["part"] == part)
+                self.assertEqual([row], read_json(path))
+                self.assertEqual("", row["label"])
+                with self.assertRaises(ValueError):
+                    review_rows([row], groups, root)
+            reading_row = read_json(root / "request/01-reading-key-request.json")[0]
+            source = evidence(root, reading, "SOURCE_ONLY")
+            for field in ("label", "reviewer", "reviewedAt", "evidenceUrl", "evidenceSha256", "locator"):
+                reading_row[field] = source[field]
+            checked = review_rows([reading_row], groups, root)
+            active, _ = activate_groups(groups, checked, checked, root, set(), source_host=source_host)
+            item = active[1]["items"][0]
+            self.assertIn("sourceKey", item)
+            self.assertNotIn("key", item)
+            self.assertEqual(original, pack.read_bytes())
+
+    def test_key_request_rejects_missing_duplicate_or_stale_rows(self):
+        group = reading_group()
+        item = group["items"][0]
+        row = {**item_binding(group, item), "part": group["part"], "number": item["number"], "status": "AWAITING_REVIEW"}
+        for rows in ([], [row, row], [{**row, "number": 102}], [{**row, "itemSha256": "0" * 64}]):
+            with self.assertRaises(ValueError):
+                key_request_rows([group], rows)
+        group["items"][0]["choices"] = item["choices"][::-1]
+        with self.assertRaises(ValueError):
+            key_request_rows([group], [row])
 
     def test_review_page_keeps_question_text_in_data_instead_of_executable_markup(self):
         with TemporaryDirectory() as work:
