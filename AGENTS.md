@@ -1,3 +1,15 @@
+# NEW HIGHEST-PRIORITY PO DIRECTION — 2-PERSON DAILY STUDY PRODUCT (2026-11-22)
+
+**The PO now prioritizes completing ALL learning features so two people can study smoothly. Google Play work is explicitly POSTPONED.** THIS supersedes old **deadline/priority** text for `FAST-03/04` / Issue #8, *but not signed baseline/QA/data-integrity safeguards*. Working branch: `development/two-user-study-mvp`.
+
+**Binding plan:** `docs/STAGE05_TWO_USER_FULL_STUDY_PRIORITY_AND_WORKPLAN_V0.1.md`. READ FIRST. Execute `STUDY-01` -> `STUDY-02` -> `STUDY-03` -> `STUDY-04`, with tests and one concise report per technical batch. Don't spend cycles on Play Console, AAB signing, screenshots or listing. Build **real** practice Part1–7, local persistent history, reviewed scoring, mistakes and a validated two-form mock engine for **two separate personal phones**. Keep current known 0.2.1 engineering preview working; use a locally assembled private study build and DO NOT push copied real media/questions to PUBLIC Git.
+
+**Rights policy:** PO says fully handled. Stop blanket copyright re-research or asking for proof again. Keep technical provenance/asset hashes and source access/robots restrictions. **Correctness is separate:** don't fabricate answer keys or mark unreviewed source items QA-ready. Build and test complete mock engine with synthetic 200-item tests but unlock real 200+200 A/B forms only when exact real items have validation, independent form separation and QA. No official ETS scaled score. Any status from old "real mock forbidden" documents refers to the prior unvalidated content and continues to forbid false unlocks; it is not a ban on engineering a properly gated mock engine under the PO's latest implementation request.
+
+**Personal study variant:** local-only data on each phone, no remote account/official ACK or claimed server time, preserve lifecycle and data reliability. This is a scoped working build; does not silently overwrite signed online-first MVP requirements. No Play publish, backend, paid service, baseline changes, formal QA claim, or large uncontrolled crawling.
+
+---
+
 # CURRENT OVERRIDE — PO RIGHTS HANDLED / FAST TRACK (2026-11-22)
 
 **READ FIRST:** `docs/STAGE05_FASTTRACK_PO_RIGHTS_AND_EXECUTION_PRIORITY_V0.2.md`. The PO confirms 100% of their copyright/legal-rights matters have been handled. **Stop any repetitive rights research, licensing questions or demands for another blanket declaration.** The repo records rights as PO-confirmed for planning; record only technical file ID/hash/source mapping for provenance. Earlier instructions demanding redundant external license investigation are superseded for Fast Track workflow, but any actual content QA, privacy, Play requirements and signed integrity gates remain binding.
