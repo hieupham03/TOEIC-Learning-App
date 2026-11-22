@@ -71,6 +71,16 @@ Android Emulator API 34 ở 360dp, Wi-Fi và dữ liệu di động tắt. Bản
 
 **GO cho gói bàn giao kỹ thuật và DEMO Part 3 trong lab. NO-GO để xác nhận đợt thử hai người đã hoàn tất.** Issue #7 giữ mở để ghi kết quả trên hai máy có đồng thuận. Sáu baseline/guardrail vẫn khớp SHA-256. APK, AAB, ZIP, dữ liệu học liệu, bản thu và log thô giữ trong khu vực cục bộ. Bản sao XML JUnit nằm ở `android-app/.tooling/fasttrack-handoff/junit/`.
 
+## Kiểm tra lại gói v0.2.1 trên nhánh mới nhất
+
+Ngày 22/11/2026, đồng bộ nhánh với commit `aacf8445ce49c7539513af5483ec4a3498aeb758`. Gradle offline chạy lại `:app:assembleDebug`, `:app:assembleLocalPreview`, `:app:bundleRelease` và buộc chạy lại ba task JUnit bằng `--rerun`. Exit 0. Mỗi biến thể có 12 test PASS, không failure, error hoặc skip. Ba scope guard, 40 test ingestion, self-test parser và 25 assertions Kotlin đều PASS. Validator bốn nhóm trả `HOLD`, cùng 0 lỗi cấu trúc và 24 hold.
+
+SHA-256 của cả hai APK trong thư mục bàn giao và AAB trùng với đầu ra Gradle. Chữ ký APK và `bundletool validate` trả exit 0. Đã kiểm tra lại CRC và bốn tệp trong ZIP, checksum APK trích từ ZIP, bốn WAV synthetic trong APK/AAB chuẩn và audio–Q32–34 trong APK Lab. Sáu baseline/guardrail tiếp tục khớp checksum. Bằng chứng của lượt này lưu cục bộ trong `android-app/.tooling/fasttrack-handoff/head-recheck/`.
+
+Emulator API 34 giải mã lại cả bốn MP3 và ảnh Part 1, exit 0. Hộp thoại ANR của `com.android.systemui` che ứng dụng sau cold boot, làm bốn kịch bản UI trả exit 1 ở bước mở Listening. Xác nhận qua window dump, chọn **Wait**, rồi chạy lại trên cùng APK. Bản synthetic qua các ca phát, tạm dừng, chạy nền, phát lại, chọn và xem lại Reading, xóa lựa chọn và kiểm tra khóa Full Mock. Lab qua ca phát, dừng, phát lại và Back trong lượt này. Bốn ca thiếu MP3, sai checksum, dữ liệu decoder từ chối và sai thứ tự liên kết đều có exit 0 sau kiểm tra lại.
+
+**GO cho gói bàn giao v0.2.1.** Lượt này không tái hiện lỗi P0/P1 trong các kịch bản đã thử. Mã ứng dụng và tệp bàn giao giữ nguyên. Smoke test hai máy vẫn **NOT RUN (0/2)** vì ADB chỉ nhận emulator trong lượt kiểm tra. Issue #7 tiếp tục mở.
+
 ## Play Internal Testing — thông tin từ chủ tài khoản
 
 1. **Package ID**. Xác nhận `vn.toeiclearning.alpha` là package muốn đăng ký và versionCode 3 chưa được dùng trên Console. [Thiết lập app Play Console](https://support.google.com/googleplay/android-developer/answer/9859152)
