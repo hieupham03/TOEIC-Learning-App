@@ -1,3 +1,11 @@
+# 2026-11-22 PO priority amendment — READ FIRST
+
+The latest PO directive states all copyright/legal rights have been handled. Read `docs/STAGE05_FASTTRACK_PO_RIGHTS_AND_EXECUTION_PRIORITY_V0.2.md` as the **current execution rule** over any older generic rights-research requests below. **Do not spend time researching licenses or asking PO to reconfirm.** Use minimal technical source/clip IDs and SHA-256 plus the PO rights assertion; preserve content QA, integrity, privacy and store-policy gates. Real samples may be tested in a clearly marked private/local **unscored** preview without claiming answer correctness or QA readiness, and never committed as public source assets.
+
+**Order:** complete FAST-01/02 immediately, including tests and local APK; only then FAST-03/04 Google Play test-track preparation. When blocked, state the blocker, finish independent work, and do not fabricate PASS.
+
+---
+
 # Codex handoff — FAST-01..04 accelerated execution
 
 The PO wants an **installable two-person internal trial by 2026-11-24** and **Google Play-ready testing bundle by 2026-12-06**. Treat these as hard prioritization/timeboxes, NOT permission to misrepresent QA or bypass any signed control. Branch: development/fasttrack-48h-preview; parent commit a0253b5e899b643ecc261323b603db3cca1073fc. READ AGENTS.md and docs/STAGE05_FASTTRACK_48H_PREVIEW_14D_PLAY_PLAN_V0.1.md FIRST.
