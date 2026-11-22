@@ -60,6 +60,7 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; margin: .5r
   <label>Part<select id="part"><option value="">Tất cả</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option></select></label>
   <label>Câu hỏi<select id="question"></select></label>
 </div>
+<label><input id="pendingKeys" type="checkbox"> Chỉ xem câu có khóa nguồn đang chờ duyệt</label>
 <div class="line"><button id="prev">Câu trước</button><button id="next">Câu sau</button></div>
 <main class="grid">
   <section aria-labelledby="questionTitle">
@@ -98,11 +99,13 @@ function options(node, entries) {
 }
 function show() {
   const row = shown[position], state = row && (drafts.get(row.id) || row.review || row.queue);
+  const candidate = row?.queue?.candidate;
   byId('questionTitle').textContent = row ? 'Part ' + row.part + ' · Câu ' + row.number : 'Không tìm thấy câu';
   byId('state').textContent = states[state?.status] || '';
   byId('prompt').textContent = row?.prompt || '';
   byId('passage').textContent = row?.passage || '';
   const fields = row ? [row.itemId, row.groupId, row.source, row.version, row.itemSha256] : [];
+  if (candidate) fields.push(candidate.evidenceUrl, candidate.evidenceSha256, candidate.locator);
   byId('meta').textContent = fields.join('\n');
   const media = byId('media');
   media.replaceChildren();
@@ -120,8 +123,9 @@ function show() {
     const li = document.createElement('li'); li.textContent = choice; return li;
   }));
   options(byId('label'), [['Chọn từ tài liệu', ''], ...Array.from('ABCD'.slice(0, row?.choices.length || 0), c => [c, c])]);
-  byId('label').value = state?.label || state?.candidate?.label || '';
-  byId('locator').value = state?.locator || state?.candidate?.locator || '';
+  byId('evidenceUrl').value = state?.evidenceUrl || candidate?.evidenceUrl || row?.source || '';
+  byId('label').value = state?.label || candidate?.label || '';
+  byId('locator').value = state?.locator || candidate?.locator || '';
   byId('explanation').value = state?.explanation || '';
   byId('explanationLocator').value = state?.explanationLocator || '';
   byId('status').value = 'SOURCE_ONLY';
@@ -132,12 +136,13 @@ function show() {
 function filter() {
   const query = value('search').toLowerCase(), part = value('part');
   shown = rows.filter(row => (!part || part === String(row.part)) &&
+    (!byId('pendingKeys').checked || row.queue?.status === 'AWAITING_REVIEW') &&
     (!query || row.id.toLowerCase().includes(query) || String(row.number) === query));
   options(byId('question'), shown.map((row, index) => ['Part ' + row.part + ' · Câu ' + row.number + ' · ' + row.id, index]));
   position = 0; show();
 }
 function move(to) { position = to; byId('question').value = String(to); show(); }
-byId('search').oninput = byId('part').onchange = filter;
+byId('search').oninput = byId('part').onchange = byId('pendingKeys').onchange = filter;
 byId('question').onchange = () => move(Number(value('question')));
 byId('prev').onclick = () => move(position - 1);
 byId('next').onclick = () => move(position + 1);
@@ -164,6 +169,11 @@ byId('save').onclick = () => {
   }
   if (status !== 'SOURCE_ONLY' && !byId('confirm').checked) {
     message.textContent = 'Xác nhận đã đối chiếu trước khi duyệt hoặc thu hồi.'; return;
+  }
+  const candidate = row.queue?.candidate;
+  if (status === 'APPROVED' && candidate && (candidate.evidenceSha256 !== evidenceSha256 ||
+      candidate.evidenceUrl !== value('evidenceUrl') || candidate.label !== value('label') || candidate.locator !== value('locator'))) {
+    message.textContent = 'Quyết định chưa khớp khóa nguồn đã lưu. Kiểm tra tệp, URL, đáp án và vị trí.'; return;
   }
   const explanation = value('explanation'), explanationLocator = value('explanationLocator');
   if ((explanation || explanationLocator) && (status !== 'APPROVED' || !explanation || !explanationLocator)) {

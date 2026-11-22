@@ -176,6 +176,25 @@ def review_rows(rows, groups, evidence, *, strict=True):
     return accepted
 
 
+def publisher_key_rows(rows, groups, evidence):
+    bindings = {item["id"]: (item_binding(group, item), tuple("ABCD"[:len(item["choices"])]))
+                for group in groups for item in group["items"]}
+    accepted, seen, locators, hashes = [], set(), set(), {}
+    for row in rows:
+        if not isinstance(row, dict) or not isinstance(row.get("itemId"), str):
+            raise ValueError("Invalid publisher key row")
+        item_id = row["itemId"]
+        if item_id not in bindings or not valid_source(row, *bindings[item_id], evidence, hashes, source_host):
+            raise ValueError("Publisher key does not match the item or evidence bytes")
+        locator = (row["evidenceSha256"], row["locator"].strip().casefold())
+        if item_id in seen or locator in locators:
+            raise ValueError("Duplicate publisher key or evidence locator")
+        seen.add(item_id)
+        locators.add(locator)
+        accepted.append(row)
+    return accepted
+
+
 def key_request_rows(groups, queue):
     """Project the pending queue into form rows bound to the current pack."""
     pending = {item["id"]: (group, item) for group in groups for item in group["items"] if not item.get("key")}
@@ -234,6 +253,7 @@ def assemble(directory=ROOT02, *, review_file=None, evidence_files=()):
         body = read_blob(body_file)
         (evidence / f"{sha256(body).hexdigest()}.bin").write_bytes(body)
     owner_rows = review_rows(optional_rows(directory / "owner/reviews.json"), groups, evidence)
+    published = publisher_key_rows(optional_rows(directory / "owner/source-keys.json"), groups, evidence)
     if review_file:
         incoming = review_rows(optional_rows(review_file), groups, evidence)
         if not incoming:
@@ -244,8 +264,10 @@ def assemble(directory=ROOT02, *, review_file=None, evidence_files=()):
         save_json(intake, merged)
         existing = merged
     decisions = review_rows(existing + owner_rows, groups, evidence, strict=False)
-    decided = {row["itemId"] for row in decisions}
-    candidates = decisions + [row for row in source_keys(groups, snapshot_source(), evidence) if row["itemId"] not in decided]
+    published_ids = {row["itemId"] for row in published}
+    candidates = published + [row for row in decisions if row["itemId"] not in published_ids]
+    found = {row["itemId"] for row in candidates}
+    candidates += [row for row in source_keys(groups, snapshot_source(), evidence) if row["itemId"] not in found]
     # A review decision is independent from the source-key projection.
     source_fields = {"itemId", "groupId", "source", "version", "itemSha256", "label", "evidenceUrl",
                      "evidenceSha256", "locator"}
@@ -286,11 +308,15 @@ if __name__ == "__main__":
     parser.add_argument("--import-review", type=Path)
     parser.add_argument("--evidence", action="append", type=Path, default=[], help="Attach original local evidence file")
     parser.add_argument("--export-key-request", action="store_true", help="Export pending Reading and Listening rows without rebuilding")
+    parser.add_argument("--workspace", default=ROOT02.name, help="Private content-NN directory under Study tooling")
     args = parser.parse_args()
+    folder = ROOT02.parent / args.workspace
+    if not re.fullmatch(r"content-[0-9]{2}", args.workspace) or folder.resolve() != folder:
+        parser.error("Select a local content-NN workspace")
     if args.export_key_request:
         if args.import_review or args.evidence:
             parser.error("Export and evidence import are separate operations")
-        report = export_key_request()
+        report = export_key_request() if folder == ROOT02 else export_key_request(folder, folder / "key-request")
     else:
-        report = assemble(review_file=args.import_review, evidence_files=args.evidence)
+        report = assemble(folder, review_file=args.import_review, evidence_files=args.evidence)
     print(json.dumps(report, ensure_ascii=False))

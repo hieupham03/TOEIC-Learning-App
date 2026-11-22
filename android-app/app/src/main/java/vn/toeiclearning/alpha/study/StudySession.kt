@@ -122,6 +122,9 @@ internal fun StudySession(
                 else -> "Part ${group.part}"
             }
             StudyHeading(title, goBack)
+            if (group.source.startsWith("https://") && studyPublisher(group.source) != "zenlishtoeic.vn") {
+                Text("${studyPublisher(group.source)} · ${group.version.take(8)}", style = MaterialTheme.typography.bodyMedium)
+            }
             if (mock != null) {
                 val seconds = mock.secondsLeft(clock)
                 val time = "${seconds / 60}:${(seconds % 60).toString().padStart(2, '0')}"
