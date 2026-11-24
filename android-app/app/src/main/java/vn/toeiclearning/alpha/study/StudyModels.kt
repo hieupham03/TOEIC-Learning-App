@@ -1,9 +1,19 @@
 package vn.toeiclearning.alpha.study
 
+import java.nio.ByteBuffer
 import java.security.MessageDigest
+import java.util.Random
 import vn.toeiclearning.alpha.domain.ListeningAsset
 
-internal data class StudyKey(val choice: Int, val evidence: String, val explanation: String? = null) {
+internal const val OCEAN_SOURCE_PREFIX = "https://github.com/kdeppaei/toeic-question-ocean/tree/"
+internal const val VOA_SUPPLEMENTAL_SOURCE = "https://learningenglish.voanews.com/a/6588866.html"
+
+internal data class StudyKey(
+    val choice: Int,
+    val evidence: String,
+    val explanation: String? = null,
+    val batchAccepted: Boolean = false,
+) {
     init { require(evidence.isNotBlank()) }
 }
 
@@ -36,6 +46,7 @@ internal data class StudyAnswerReview(
     val reviewer: String,
     val evidence: String,
     val explanation: String? = null,
+    val batchAccepted: Boolean = false,
 )
 
 internal fun studyItemDigest(group: StudyGroup, item: StudyItem): String {
@@ -60,7 +71,7 @@ internal fun applyStudyAnswer(
         !source.evidenceSha256.matches(Regex("[a-f0-9]{64}")) || source.itemSha256 != studyItemDigest(group, item)
     ) return item.copy(key = null, hasSourceKey = false)
     val key = review?.takeIf { it.proof == source && it.reviewer.isNotBlank() && it.evidence.isNotBlank() }
-        ?.let { StudyKey(source.choice, it.evidence, it.explanation) }
+        ?.let { StudyKey(source.choice, it.evidence, it.explanation, it.batchAccepted) }
     return item.copy(key = key, hasSourceKey = true)
 }
 
@@ -116,6 +127,23 @@ internal data class StudyAttempt(
     fun select(choice: Int): StudyAttempt {
         require(choice in item.choices.indices)
         return if (complete) this else copy(selections = selections + (item.id to choice))
+    }
+
+    fun displayChoiceOrder(): List<Int> {
+        val order = item.choices.indices.toMutableList()
+        if (mock == null && group.source.startsWith(OCEAN_SOURCE_PREFIX)) {
+            // SQLite snapshots retain source indices. Keep the display order stable for each saved attempt.
+            val seed = MessageDigest.getInstance("SHA-256")
+                .digest("$id:${group.version}:${item.id}".toByteArray(Charsets.UTF_8))
+            val random = Random(ByteBuffer.wrap(seed).long)
+            for (index in order.lastIndex downTo 1) {
+                val swapIndex = random.nextInt(index + 1)
+                val choice = order[index]
+                order[index] = order[swapIndex]
+                order[swapIndex] = choice
+            }
+        }
+        return order
     }
 
     fun move(index: Int): StudyAttempt = copy(position = index.coerceIn(items.indices))

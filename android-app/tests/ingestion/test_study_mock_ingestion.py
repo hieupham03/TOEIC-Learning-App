@@ -80,6 +80,15 @@ class MockIngestionTests(unittest.TestCase):
                 self.assertEqual(0, no_keys["mock_inventory"]["A"]["reviewed"])
                 self.assertEqual([], no_keys["published_forms"])
                 save_json(owner / "source-keys.json", a_keys + b_keys)
+                save_json(review_file, [{**decisions[0], "reviewScope": "PO_BATCH_ACCEPTANCE"}])
+                batch = assemble(root, review_file=review_file)
+                self.assertEqual((200, 199, "ITEM_REVIEW_REQUIRED"), (
+                    batch["mock_inventory"]["A"]["source_keys"], batch["mock_inventory"]["A"]["reviewed"],
+                    batch["mock_inventory"]["A"]["status"],
+                ))
+                self.assertEqual([], batch["published_forms"])
+                save_json(review_file, [decisions[0]])
+                assemble(root, review_file=review_file)
                 checked = assemble(root)
                 for form in (a, b):
                     status = checked["mock_inventory"][form["id"]]

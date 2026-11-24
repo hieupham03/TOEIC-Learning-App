@@ -319,14 +319,18 @@ private fun StudyHome(
         val groups = byPart[part].orEmpty()
         val items = groups.flatMap { it.items }
         Text("Part $part · ${if (part <= 4) "Listening" else "Reading"}", style = MaterialTheme.typography.titleMedium)
-        Text("${items.size} câu khả dụng · ${items.count { it.hasSourceKey }} có đáp án nguồn · ${items.count { it.key != null }} đã duyệt")
+        Text("${items.size} câu khả dụng · ${items.count { it.hasSourceKey }} có đáp án nguồn · ${items.count { it.key != null }} chấm được")
         val editions = groups.groupBy { it.source to it.version }.values
         val publisherCounts = editions.groupingBy { studyPublisher(it.first().source) }.eachCount()
         if (editions.isEmpty()) StudyButton("Luyện Part $part", enabled = false) {}
         for (edition in editions) {
             val first = edition.first()
             val repeatedPublisher = (publisherCounts[studyPublisher(first.source)] ?: 0) > 1
-            val label = if (editions.size == 1) "Luyện Part $part" else "Luyện Part $part · ${studyEditionLabel(first, repeatedPublisher)}"
+            val label = when {
+                first.source == VOA_SUPPLEMENTAL_SOURCE -> "Luyện nghe bổ sung · VOA Learning English"
+                editions.size == 1 -> "Luyện Part $part"
+                else -> "Luyện Part $part · ${studyEditionLabel(first, repeatedPublisher)}"
+            }
             val batches = if (edition.sumOf { it.items.size } <= 200) listOf(edition) else edition.chunked(40)
             batches.forEachIndexed { index, batch ->
                 val title = if (batches.size == 1) label else "$label · lượt ${index + 1}"
@@ -338,11 +342,14 @@ private fun StudyHome(
     StudyButton("Full Mock A / B", !busy, onClick = onMock)
 }
 
-internal fun studyPublisher(source: String): String = Uri.parse(source).host?.removePrefix("www.") ?: source
+internal fun studyPublisher(source: String): String =
+    if (source.startsWith(OCEAN_SOURCE_PREFIX)) "TOEIC Question Ocean"
+    else Uri.parse(source).host?.removePrefix("www.") ?: source
 
 private fun studyEditionLabel(group: StudyGroup, showEdition: Boolean): String {
     val publisher = studyPublisher(group.source)
     if (!showEdition) return publisher
+    if (group.source.startsWith(OCEAN_SOURCE_PREFIX)) return "$publisher · ${group.version.take(8)}"
     val edition = Uri.parse(group.source).lastPathSegment?.takeIf(String::isNotBlank)
     return if (edition == null) "$publisher · ${group.version.take(8)}"
     else "$publisher · $edition · ${group.version.take(8)}"

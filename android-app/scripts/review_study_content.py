@@ -171,7 +171,8 @@ def release_mock_pair(inventories, active_groups, evidence):
         items = [item for group in groups for item in group["items"]]
         digest = sha256(json.dumps(groups, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
         sourced = sum("sourceKey" in i for i in items)
-        verified = sum(i.get("key", {}).get("status") == "VERIFIED" for i in items)
+        verified = sum(key.get("status") == "VERIFIED" and not key.get("batchAccepted")
+                       for item in items if (key := item.get("key")))
         status = "MISSING_INVENTORY"
         if inventory:
             status = "STRUCTURE_INCOMPLETE"

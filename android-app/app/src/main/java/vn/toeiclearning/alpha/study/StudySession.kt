@@ -94,6 +94,7 @@ internal fun StudySession(
         }
     }
     val hasPassage = group.part >= 6
+    val choiceOrder = attempt.displayChoiceOrder()
     var showPassage by remember(attempt.id, group.id) { mutableStateOf(hasPassage && !attempt.complete) }
     val questionStrip = rememberLazyListState()
     LaunchedEffect(attempt.position, allowed.firstOrNull(), showPassage, attempt.complete) {
@@ -124,7 +125,9 @@ internal fun StudySession(
                 else -> "Part ${group.part}"
             }
             StudyHeading(title, goBack)
-            if (group.source.startsWith("https://") && studyPublisher(group.source) != "zenlishtoeic.vn") {
+            if (group.source == VOA_SUPPLEMENTAL_SOURCE) {
+                Text("Luyện nghe bổ sung · VOA Learning English / Bryan Lynn", style = MaterialTheme.typography.bodyMedium)
+            } else if (group.source.startsWith("https://") && studyPublisher(group.source) != "zenlishtoeic.vn") {
                 Text("${studyPublisher(group.source)} · ${group.version.take(8)}", style = MaterialTheme.typography.bodyMedium)
             }
             if (mock != null) {
@@ -172,7 +175,8 @@ internal fun StudySession(
                     if (attempt.complete) {
                         val answer = item.key
                         if (answer != null) {
-                            Text("Đáp án đã xác minh · ${'A' + answer.choice}")
+                            val label = if (answer.batchAccepted) "Đáp án nguồn" else "Đáp án đã xác minh"
+                            Text("$label · ${'A' + choiceOrder.indexOf(answer.choice)}")
                             Text(when (attempt.selections[item.id]) {
                                 null -> "Bạn chưa trả lời câu này."
                                 answer.choice -> "Bạn trả lời đúng."
@@ -180,6 +184,7 @@ internal fun StudySession(
                             })
                         } else Text(if (item.hasSourceKey) SOURCE_KEY_UNGRADED else "Câu này chưa có đáp án đã xác minh.")
                     } else Text(when {
+                        item.key?.batchAccepted == true -> "Lô đã được PO chấp nhận · chấm theo đáp án nguồn."
                         item.key != null -> "Đã kiểm duyệt · chấm khi kết thúc bài."
                         item.hasSourceKey -> SOURCE_KEY_UNGRADED
                         else -> "Câu này chưa có đáp án đã xác minh."
@@ -194,11 +199,12 @@ internal fun StudySession(
                     if (attempt.complete) group.passage?.let { Text(it, style = MaterialTheme.typography.bodyLarge) }
                     Text("Câu ${item.number}${if (item.prompt.isBlank()) "" else " · ${item.prompt}"}",
                         style = MaterialTheme.typography.titleMedium)
-                    item.choices.forEachIndexed { index, choice ->
+                    choiceOrder.forEachIndexed { index, sourceIndex ->
                         val option = ('A' + index).toString()
-                        val chosen = attempt.selections[item.id] == index
+                        val choice = item.choices[sourceIndex]
+                        val chosen = attempt.selections[item.id] == sourceIndex
                         OutlinedButton(
-                            onClick = { onChange(attempt.select(index)) },
+                            onClick = { onChange(attempt.select(sourceIndex)) },
                             enabled = !busy && !attempt.complete && attempt.position in allowed,
                             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).semantics { selected = chosen },
                         ) { Text(if (choice == option) "$option${if (chosen) " · Đã chọn" else ""}"

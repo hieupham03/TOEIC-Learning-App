@@ -31,6 +31,31 @@ class StudyAttemptTest {
         assertFalse(final.interrupted)
     }
 
+    @Test fun oceanChoiceOrderMapsSelectionsAndResultsToTheOriginalIndices() {
+        val ocean = group.copy(source = "${OCEAN_SOURCE_PREFIX}fixture")
+        val start = (1L..10L).map { StudyAttempt(listOf(ocean), id = it) }
+            .first { it.displayChoiceOrder().indexOf(1) != 1 }
+        val visible = start.displayChoiceOrder()
+        assertEquals(options.indices.toSet(), visible.toSet())
+        val chosen = visible.indexOf(ocean.items.first().key!!.choice)
+        val saved = start.select(visible[chosen]).move(2)
+        val resumed = saved.copy(selections = saved.selections.toMap()).move(0)
+        assertEquals(visible, resumed.displayChoiceOrder())
+        assertEquals(1, resumed.selections["q1"])
+        assertEquals(1, resumed.finish(1000).score().correct)
+        assertTrue(start.select(visible[(chosen + 1) % options.size]).finish(1000).mistakes().any { it.id == "q1" })
+    }
+
+    @Test fun displayOrderVariesAcrossOceanAttemptsAndSurvivesKeyRevocation() {
+        val ocean = group.copy(source = "${OCEAN_SOURCE_PREFIX}fixture")
+        val attempt = StudyAttempt(listOf(ocean), id = 7)
+        val updated = ocean.copy(items = ocean.items.map { it.copy(key = null) })
+        assertEquals(attempt.displayChoiceOrder(), attempt.retainCurrentPracticeKeys(listOf(updated)).displayChoiceOrder())
+        val positions = (1L..40L).map { attempt.copy(id = it).displayChoiceOrder().indexOf(1) }
+        assertEquals(options.indices.toSet(), positions.toSet())
+        assertEquals(options.indices.toList(), attempt.copy(groups = listOf(group)).displayChoiceOrder())
+    }
+
     @Test fun suggestionUsesWeakestGradedPartOrLeastAttemptedAvailablePart() {
         assertEquals(3, recommendedPart(setOf(1, 3, 5), listOf(PartStats(1, 2, 1), PartStats(3, 4, 1))))
         assertEquals(3, recommendedPart(setOf(1, 3, 5), listOf(PartStats(1, 0, 0, 3))))
@@ -53,6 +78,8 @@ class StudyAttemptTest {
         assertNull(applyStudyAnswer(group, original, source, review.copy(proof = source.copy(choice = 1))).key)
         assertNull(applyStudyAnswer(group, original, source, review.copy(reviewer = "")).key)
         assertEquals(2, eligible.key?.choice)
+        assertFalse(eligible.key!!.batchAccepted)
+        assertTrue(applyStudyAnswer(group, original, source, review.copy(batchAccepted = true)).key!!.batchAccepted)
     }
 
     @Test fun imageOrderAndRevocationAffectNewAttemptsWithoutRescoringHistory() {

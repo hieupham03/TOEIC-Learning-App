@@ -56,7 +56,8 @@ private fun mockGroupComplete(group: StudyGroup): Boolean {
         6 -> length == 4
         else -> length in 2..5
     }
-    return requiredLength && group.items.all { it.key != null } &&
+    return requiredLength && group.source != VOA_SUPPLEMENTAL_SOURCE &&
+        group.items.all { it.key?.batchAccepted == false } &&
         (group.part !in 1..4 || group.audio != null) &&
         (group.part != 1 || group.image != null) &&
         (group.part !in 6..7 || group.image != null || !group.passage.isNullOrBlank())

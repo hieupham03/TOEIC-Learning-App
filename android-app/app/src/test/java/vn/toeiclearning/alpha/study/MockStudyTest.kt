@@ -18,6 +18,11 @@ class MockStudyTest {
         assertFalse(checkMockForms(listOf(a, b), listOf(a.groups[0])).ready)
         assertFalse(checkMockForms(listOf(a, b.copy(groups = a.groups)), emptyList()).ready)
         assertEquals(200, checkMockForms(emptyList(), emptyList()).missing.getValue("A"))
+        val first = b.groups.first()
+        val batchGroup = first.copy(items = first.items.map { it.copy(key = it.key!!.copy(batchAccepted = true)) })
+        val batchForm = b.copy(groups = listOf(batchGroup) + b.groups.drop(1))
+        assertEquals(1, checkMockForms(listOf(a, batchForm), emptyList()).missing.getValue("B"))
+        assertFalse(checkMockForms(listOf(a, batchForm), emptyList()).ready)
     }
 
     @Test fun changingIdsOrOptionOrderCannotHideRepeatedQuestionsOrImages() {

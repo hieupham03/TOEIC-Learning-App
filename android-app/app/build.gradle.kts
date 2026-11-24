@@ -37,9 +37,14 @@ android {
         }
     }
     sourceSets.getByName("localPreview").assets.srcDir("../.tooling/fasttrack-handoff/part3-assets")
+    val acceptedContent = "../.tooling/two-user-study/content-07/release-assets"
     val content06 = "../.tooling/two-user-study/content-06/assets"
     val studyAssets = providers.gradleProperty("studyAssetsDir").orElse(
-        if (file("$content06/study_pack/pack.json").isFile) content06 else "../.tooling/two-user-study/content-04/assets"
+        when {
+            file("$acceptedContent/study_pack/pack.json").isFile -> acceptedContent
+            file("$content06/study_pack/pack.json").isFile -> content06
+            else -> "../.tooling/two-user-study/content-04/assets"
+        }
     )
     sourceSets.getByName("study").assets.srcDir(studyAssets.get())
     compileOptions {
@@ -57,8 +62,8 @@ android {
 androidComponents {
     onVariants(selector().withBuildType("study")) { variant ->
         variant.outputs.forEach {
-            it.versionCode.set(11)
-            it.versionName.set("0.3.7-study")
+            it.versionCode.set(12)
+            it.versionName.set("0.3.8-study")
         }
     }
 }
