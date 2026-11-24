@@ -10,7 +10,8 @@ from urllib.parse import urlsplit
 
 from acquire_study_content import PART_ENDS, write_json
 from activate_study_content import (
-    SHA, activate_groups, group_assets, item_binding, nonempty, optional_rows, source_keys, valid_source, verify_media,
+    SHA, activate_groups, evidence_matches, group_assets, item_binding, nonempty, optional_rows, source_keys,
+    valid_source, verify_media,
 )
 from extend_study_content import ROOT02, save_json, seed_previous, snapshot_source
 from listening_manifest import read_blob, read_json
@@ -124,8 +125,9 @@ def owner_groups(root, previous, media):
     quarantine = root.parent / "inventory-media"
     quarantine.mkdir(exist_ok=True)
     for inventory in bundle["inventories"]:
-        if (not isinstance(inventory, dict) or set(inventory) != {"id", "groups"} or inventory["id"] not in ("A", "B")
-                or inventory["id"] in inventory_ids or not isinstance(inventory["groups"], list)):
+        if (not isinstance(inventory, dict) or inventory.keys() - {"id", "groups", "review"}
+                or inventory.get("id") not in ("A", "B")
+                or inventory["id"] in inventory_ids or not isinstance(inventory.get("groups"), list)):
             raise ValueError("Invalid owner inventory")
         inventory_ids.add(inventory["id"])
         for group in inventory["groups"]:
@@ -142,6 +144,62 @@ def owner_groups(root, previous, media):
     for group in bundle["practice"]:
         verify_media(group, media, root / "media")
     return bundle["practice"], bundle["inventories"]
+
+
+def mock_form_review(review, digest, evidence, cache):
+    if (not isinstance(review, dict) or review.get("status") != "APPROVED" or review.get("formSha256") != digest
+            or not nonempty(review.get("reviewer")) or not nonempty(review.get("locator"))):
+        return None
+    try:
+        stamp = review["reviewedAt"]
+        if date.fromisoformat(stamp).isoformat() != stamp:
+            return None
+        source_host(review["evidenceUrl"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    if not evidence_matches(evidence, review.get("evidenceSha256"), cache):
+        return None
+    return {"status": "APPROVED", "evidence": f'{review["evidenceUrl"]}#{review["locator"]}'}
+
+
+def release_mock_pair(inventories, active_groups, evidence):
+    by_id = {entry["id"]: entry for entry in inventories}
+    summary, ready, cache = {}, [], {}
+    for slot in ("A", "B"):
+        inventory = by_id.get(slot, {})
+        groups = [active_groups[g["id"]] for g in inventory.get("groups", []) if g["id"] in active_groups]
+        items = [item for group in groups for item in group["items"]]
+        digest = sha256(json.dumps(groups, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        sourced = sum("sourceKey" in i for i in items)
+        verified = sum(i.get("key", {}).get("status") == "VERIFIED" for i in items)
+        status = "MISSING_INVENTORY"
+        if inventory:
+            status = "STRUCTURE_INCOMPLETE"
+            if ([i["number"] for i in items] == list(range(1, 201))
+                    and all(sum(len(g["items"]) for g in groups if g["part"] <= part) == end
+                            for part, end in enumerate(PART_ENDS, 1))):
+                status = "ITEM_REVIEW_REQUIRED"
+                if sourced == verified == 200:
+                    review = mock_form_review(inventory.get("review"), digest, evidence, cache)
+                    status = "FORM_REVIEW_REQUIRED"
+                    if review:
+                        status = "FORM_READY"
+                        ready.append({"id": slot, "version": digest, "groups": groups, "review": review})
+        summary[slot] = {"available": len(items), "source_keys": sourced, "reviewed": verified,
+                         "form_sha256": digest if groups else None, "status": status}
+    return (ready if len(ready) == 2 else []), summary
+
+
+def remove_inactive_mock_media(previous_pack, pack, media):
+    retained = {asset["path"] for group in
+                pack["practice"] + [g for form in pack.get("forms", []) for g in form["groups"]]
+                for _, asset in group_assets(group)}
+    for form in previous_pack.get("forms", []):
+        for group in form["groups"]:
+            for _, asset in group_assets(group):
+                path = asset["path"]
+                if path not in retained and re.fullmatch(r"study_pack/media/[0-9a-f]{64}\.(?:mp3|png|jpg)", path):
+                    (media / Path(path).name).unlink(missing_ok=True)
 
 
 def review_rows(rows, groups, evidence, *, strict=True):
@@ -222,7 +280,8 @@ def export_key_request(source=ROOT02, destination=ROOT02.parent / "content-03" /
     if digest != read_json(source / "activation.json")["pack_sha256"]:
         raise ValueError("Study pack differs from its activation receipt")
     pack = read_json(pack_path)
-    rows = key_request_rows(pack["practice"], read_json(source / "answer-review-queue.json"))
+    queue = [row for row in read_json(source / "answer-review-queue.json") if "form" not in row]
+    rows = key_request_rows(pack["practice"], queue)
     reading = [row for row in rows if row["part"] >= 5]
     listening = [row for row in rows if row["part"] < 5]
     destination.mkdir(parents=True, exist_ok=True)
@@ -245,6 +304,10 @@ def assemble(directory=ROOT02, *, review_file=None, evidence_files=()):
     extra, inventories = owner_groups(directory / "owner", groups, owner_staging)
     groups += extra
     groups.sort(key=lambda group: (group["part"], group["source"], group["version"], group["items"][0]["number"]))
+    form_by_group = {group["id"]: form["id"] for form in inventories for group in form["groups"]}
+    practice_ids = {item["id"] for group in groups for item in group["items"]}
+    practice = groups.copy()
+    groups.extend(group for form in inventories for group in form["groups"])
     evidence = directory / "source-evidence"
     evidence.mkdir(exist_ok=True)
     intake = directory / "review-decisions.json"
@@ -265,41 +328,55 @@ def assemble(directory=ROOT02, *, review_file=None, evidence_files=()):
         existing = merged
     decisions = review_rows(existing + owner_rows, groups, evidence, strict=False)
     published_ids = {row["itemId"] for row in published}
-    candidates = published + [row for row in decisions if row["itemId"] not in published_ids]
+    candidates = published + [row for row in decisions
+                              if row["itemId"] in practice_ids and row["itemId"] not in published_ids]
     found = {row["itemId"] for row in candidates}
-    candidates += [row for row in source_keys(groups, snapshot_source(), evidence) if row["itemId"] not in found]
+    candidates += [row for row in source_keys(practice, snapshot_source(), evidence) if row["itemId"] not in found]
     # A review decision is independent from the source-key projection.
     source_fields = {"itemId", "groupId", "source", "version", "itemSha256", "label", "evidenceUrl",
                      "evidenceSha256", "locator"}
     keys = [{key: row[key] for key in sorted(source_fields)} for row in candidates]
     withdrawn = set(optional_rows(directory / "withdrawn-groups.json"))
     active, queue = activate_groups(groups, keys, decisions, evidence, withdrawn, source_host=source_host)
-    pack = {"schema": 1, "practice": active}
+    forms, inventory_status = release_mock_pair(inventories, {group["id"]: group for group in active}, evidence)
+    for row in queue:
+        if row["groupId"] in form_by_group:
+            row["form"] = form_by_group[row["groupId"]]
+    practice = [group for group in active if group["id"] not in form_by_group]
+    pack = {"schema": 1, "practice": practice}
+    if forms:
+        pack["forms"] = forms
     if len((json.dumps(pack, ensure_ascii=False, indent=2) + "\n").encode("utf-16-le")) // 2 > 1_000_000:
         raise ValueError("Study pack exceeds the Android manifest limit")
     extra_ids = {group["id"] for group in extra}
-    for group in active:
+    for group in practice:
         if group["id"] in extra_ids:
             verify_media(group, media, owner_staging)
+    for form in forms:
+        for group in form["groups"]:
+            verify_media(group, media, directory / "inventory-media")
     save_json(directory / "source-keys.json", keys)
     save_json(directory / "reviews.json", decisions)
     save_json(directory / "answer-review-queue.json", queue)
     target = media.parent / "pack.json"
+    previous_pack = read_json(target) if target.is_file() else {}
     save_json(target, pack)
+    remove_inactive_mock_media(previous_pack, pack, media)
     counts = {}
     for part in range(1, 8):
-        items = [item for group in active if group["part"] == part for item in group["items"]]
+        items = [item for group in practice if group["part"] == part for item in group["items"]]
         counts[part] = {"available": len(items), "source_keys": sum("sourceKey" in item for item in items),
                         "reviewed": sum("key" in item for item in items)}
-    report = {"counts": counts, "groups": len(active), "queued": len(queue),
+    report = {"counts": counts, "groups": len(practice), "queued": len(queue),
               "queue_status": dict(Counter(row["status"] for row in queue)),
               "decisions": dict(Counter(row["status"] for row in decisions)),
               "owner_items": sum(len(group["items"]) for group in extra),
-              "quarantined_forms": {f["id"]: sum(len(g["items"]) for g in f["groups"]) for f in inventories},
+              "quarantined_forms": {f["id"]: sum(len(g["items"]) for g in f["groups"]) for f in inventories if not forms},
+              "mock_inventory": inventory_status, "published_forms": [form["id"] for form in forms],
               "pack_sha256": sha256(target.read_bytes()).hexdigest()}
     write_json(directory / "activation.json", report)
     from study_review_page import render_review
-    render_review(directory / "review.html", active, queue, decisions)
+    render_review(directory / "review.html", active, queue, decisions, form_by_group=form_by_group)
     return report
 
 

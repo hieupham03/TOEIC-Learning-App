@@ -41,20 +41,29 @@ def nonempty(value):
     return isinstance(value, str) and bool(value.strip())
 
 
+def evidence_matches(evidence_dir, digest, cache):
+    if not isinstance(digest, str) or not SHA.fullmatch(digest):
+        return False
+    if digest not in cache:
+        path = evidence_dir / f"{digest}.bin"
+        try:
+            cache[digest] = (path.resolve().parent == evidence_dir.resolve() and 0 < path.stat().st_size <= MAX_MEDIA
+                             and sha256(path.read_bytes()).hexdigest() == digest)
+        except OSError:
+            cache[digest] = False
+    return cache[digest]
+
+
 def valid_source(row, binding, labels, evidence_dir, cache, source_host=approved_host):
     digest = row.get("evidenceSha256")
     if (any(row.get(field) != value for field, value in binding.items()) or row.get("label") not in labels
-            or not isinstance(digest, str) or not SHA.fullmatch(digest) or not nonempty(row.get("locator"))):
+            or not nonempty(row.get("locator"))):
         return False
     try:
         if source_host(row.get("evidenceUrl", "")) != source_host(binding["source"]):
             return False
-        if digest not in cache:
-            path = evidence_dir / f"{digest}.bin"
-            cache[digest] = (path.resolve().parent == evidence_dir.resolve() and 0 < path.stat().st_size <= MAX_MEDIA
-                             and sha256(path.read_bytes()).hexdigest() == digest)
-        return cache[digest]
-    except (OSError, TypeError, ValueError):
+        return evidence_matches(evidence_dir, digest, cache)
+    except (TypeError, ValueError):
         return False
 
 

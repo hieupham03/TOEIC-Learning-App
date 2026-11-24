@@ -4,11 +4,13 @@ import json
 from activate_study_content import group_assets, item_binding
 
 
-def render_review(target, groups, queue, decisions):
+def render_review(target, groups, queue, decisions, *, form_by_group=None):
     pending = {row["itemId"]: row for row in queue}
     reviewed = {row["itemId"]: row for row in decisions}
+    forms = form_by_group or {}
     rows = [
         {**item_binding(group, item), **item, "part": group["part"], "passage": group.get("passage"),
+         "form": forms.get(group["id"]),
          "assets": [{"kind": kind, "path": asset["path"], "sha256": asset["sha256"]} for kind, asset in group_assets(group)],
          "queue": pending.get(item["id"]), "review": reviewed.get(item["id"])}
         for group in groups for item in group["items"]
@@ -111,7 +113,7 @@ function showEvidenceMatch() {
 function show() {
   const row = shown[position], state = row && (drafts.get(row.id) || row.review || row.queue);
   const candidate = row?.queue?.candidate;
-  byId('questionTitle').textContent = row ? 'Part ' + row.part + ' · Câu ' + row.number : 'Không tìm thấy câu';
+  byId('questionTitle').textContent = row ? questionLabel(row) : 'Không tìm thấy câu';
   byId('state').textContent = states[state?.status] || '';
   byId('prompt').textContent = row?.prompt || '';
   byId('passage').textContent = row?.passage || '';
@@ -129,7 +131,8 @@ function show() {
     } else {
       element.alt = 'Ảnh nguồn ' + (index + 1); element.loading = 'lazy';
     }
-    element.src = 'assets/' + asset.path; media.append(element);
+    element.src = row.form ? 'inventory-media/' + asset.path.split('/').at(-1) : 'assets/' + asset.path;
+    media.append(element);
     const hash = document.createElement('p'); hash.className = 'meta'; hash.textContent = 'SHA-256 ' + asset.sha256; media.append(hash);
   });
   byId('choices').replaceChildren(...(row?.choices || []).map(choice => {
@@ -147,12 +150,15 @@ function show() {
   byId('save').disabled = !row;
   byId('prev').disabled = !row || position < 1; byId('next').disabled = position >= shown.length - 1;
 }
+function questionLabel(row) {
+  return (row.form ? 'Đề ' + row.form + ' · ' : '') + 'Part ' + row.part + ' · Câu ' + row.number;
+}
 function filter() {
   const query = value('search').toLowerCase(), part = value('part');
   shown = rows.filter(row => (!part || part === String(row.part)) &&
     (!byId('pendingKeys').checked || row.queue?.status === 'AWAITING_REVIEW') &&
     (!query || row.id.toLowerCase().includes(query) || String(row.number) === query));
-  options(byId('question'), shown.map((row, index) => ['Part ' + row.part + ' · Câu ' + row.number + ' · ' + row.id, index]));
+  options(byId('question'), shown.map((row, index) => [questionLabel(row) + ' · ' + row.id, index]));
   position = 0; show();
 }
 function move(to) { position = to; byId('question').value = String(to); show(); }

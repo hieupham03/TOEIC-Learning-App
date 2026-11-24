@@ -106,10 +106,16 @@ internal fun StudyApp() {
         }
 
     fun continueAttempt(id: Long) {
-        val currentGroups = pack?.groups.orEmpty()
+        val currentPack = pack
         runLocal({
             val previous = checkNotNull(store.attempt(id))
-            val checked = previous.retainCurrentPracticeKeys(currentGroups).advanceMock(mockTime(), recovering = true)
+            val time = mockTime()
+            val mock = previous.mock
+            val checked = if (!previous.complete && mock != null &&
+                (currentPack?.mocks?.ready != true ||
+                    currentPack.forms.none { it.id == mock.form && it.version == mock.version })
+            ) previous.finish(time.wall, interrupted = true)
+            else previous.retainCurrentPracticeKeys(currentPack?.groups.orEmpty()).advanceMock(time, recovering = true)
             (if (previous == checked) previous else store.save(checked, day(), updateSnapshot = previous.groups != checked.groups)) to
                 store.dashboard(day())
         }) { (saved, stats) ->

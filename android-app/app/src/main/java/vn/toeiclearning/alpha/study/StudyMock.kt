@@ -30,18 +30,18 @@ internal fun checkMockForms(forms: List<MockForm>, practice: List<StudyGroup>): 
     val grouped = forms.flatMap { it.groups } + practice
     val ids = grouped.flatMap { group -> group.items.map { it.id } }
     val groupIds = grouped.map { it.id }
-    val audio = grouped.mapNotNull { it.audio?.sha256 }
+    val media = grouped.flatMap { listOfNotNull(it.audio) + it.images }.map { it.sha256 }
     val text = grouped.flatMap { group ->
         group.items.map { item ->
-            val content = (listOf(item.prompt) + item.choices).joinToString("\u0000").normalized()
+            val content = (listOf(item.prompt.normalized()) + item.choices.map { it.normalized() }.sorted()).joinToString("\u0000")
             val context = if (group.part <= 4) group.audio?.sha256 else
                 (group.passage.orEmpty() + group.images.joinToString("") { it.sha256 }).normalized()
             "$context\u0000$content"
         }
     }
     if (forms.isNotEmpty() && (ids.size != ids.toSet().size || groupIds.size != groupIds.toSet().size ||
-            audio.size != audio.toSet().size || text.size != text.toSet().size)) {
-        issues += "Phát hiện trùng ID, nội dung hoặc audio giữa các đề và ngân hàng luyện."
+            media.size != media.toSet().size || text.size != text.toSet().size)) {
+        issues += "Phát hiện trùng ID, nội dung hoặc media giữa các đề và ngân hàng luyện."
     }
     return MockAvailability(issues.isEmpty() && missing.values.all { it == 0 }, missing, issues)
 }

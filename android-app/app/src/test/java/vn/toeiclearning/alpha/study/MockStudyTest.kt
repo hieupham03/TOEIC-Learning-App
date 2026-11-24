@@ -20,6 +20,20 @@ class MockStudyTest {
         assertEquals(200, checkMockForms(emptyList(), emptyList()).missing.getValue("A"))
     }
 
+    @Test fun changingIdsOrOptionOrderCannotHideRepeatedQuestionsOrImages() {
+        val a = form("A")
+        val b = form("B")
+        val otherReading = b.groups.first { it.part == 5 }
+        val copied = otherReading.copy(items = otherReading.items.map { item ->
+            val original = a.groups.first { it.part == 5 }.items.single()
+            item.copy(prompt = original.prompt, choices = original.choices.reversed())
+        })
+        val repeatedQuestion = b.copy(groups = b.groups.map { if (it.id == copied.id) copied else it })
+        assertFalse(checkMockForms(listOf(a, repeatedQuestion), emptyList()).ready)
+        val sharedPhoto = b.groups.first().copy(image = a.groups.first().image)
+        assertFalse(checkMockForms(listOf(a, b.copy(groups = listOf(sharedPhoto) + b.groups.drop(1))), emptyList()).ready)
+    }
+
     @Test fun retainsTwoHundredSelectionsAcrossSectionsAndScoresByPart() {
         val form = form("A")
         val start = MockTime(3, 1000, 100_000)
@@ -70,7 +84,8 @@ class MockStudyTest {
                         if (part == 2) listOf("A", "B", "C") else listOf("A", "B", "C", "D"),
                         StudyKey(0, "Original fixture key"))
                 }, passage = if (part >= 6) "Original $groupId passage" else null,
-                    audio = if (part <= 4) media else null, image = if (part == 1) media else null)
+                    audio = if (part <= 4) media else null,
+                    image = if (part == 1) ListeningAsset("test/$groupId-image", 20, "fixture-$groupId-image") else null)
             }
         }
         return MockForm(id, "v1", "Synthetic review record $id", groups)
