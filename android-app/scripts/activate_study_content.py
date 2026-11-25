@@ -106,6 +106,8 @@ def activate_groups(groups, candidates, reviews, evidence_dir, withdrawn_ids, *,
                                    "evidence": f'{candidate["evidenceUrl"]}#{candidate["locator"]}'}
                     if approval.get("reviewScope") == "PO_BATCH_ACCEPTANCE":
                         item["key"]["batchAccepted"] = True
+                    if approval.get("reviewScope") == "SOURCE_KEY_PRACTICE":
+                        item["key"]["practiceOnly"] = True
                     if nonempty(approval.get("explanation")) and nonempty(approval.get("explanationLocator")):
                         item["key"]["explanation"] = approval["explanation"]
                 elif len(review) == 1 and review[0].get("status") == "REVOKED":

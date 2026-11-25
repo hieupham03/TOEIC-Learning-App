@@ -23,6 +23,9 @@ class MockStudyTest {
         val batchForm = b.copy(groups = listOf(batchGroup) + b.groups.drop(1))
         assertEquals(1, checkMockForms(listOf(a, batchForm), emptyList()).missing.getValue("B"))
         assertFalse(checkMockForms(listOf(a, batchForm), emptyList()).ready)
+        val studyGroup = first.copy(items = first.items.map { it.copy(key = it.key!!.copy(practiceOnly = true)) })
+        val studyForm = b.copy(groups = listOf(studyGroup) + b.groups.drop(1))
+        assertFalse(checkMockForms(listOf(a, studyForm), emptyList()).ready)
     }
 
     @Test fun changingIdsOrOptionOrderCannotHideRepeatedQuestionsOrImages() {

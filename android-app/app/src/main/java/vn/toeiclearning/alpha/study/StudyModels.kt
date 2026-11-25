@@ -13,6 +13,7 @@ internal data class StudyKey(
     val evidence: String,
     val explanation: String? = null,
     val batchAccepted: Boolean = false,
+    val practiceOnly: Boolean = false,
 ) {
     init { require(evidence.isNotBlank()) }
 }
@@ -47,6 +48,7 @@ internal data class StudyAnswerReview(
     val evidence: String,
     val explanation: String? = null,
     val batchAccepted: Boolean = false,
+    val practiceOnly: Boolean = false,
 )
 
 internal fun studyItemDigest(group: StudyGroup, item: StudyItem): String {
@@ -71,7 +73,7 @@ internal fun applyStudyAnswer(
         !source.evidenceSha256.matches(Regex("[a-f0-9]{64}")) || source.itemSha256 != studyItemDigest(group, item)
     ) return item.copy(key = null, hasSourceKey = false)
     val key = review?.takeIf { it.proof == source && it.reviewer.isNotBlank() && it.evidence.isNotBlank() }
-        ?.let { StudyKey(source.choice, it.evidence, it.explanation, it.batchAccepted) }
+        ?.let { StudyKey(source.choice, it.evidence, it.explanation, it.batchAccepted, it.practiceOnly) }
     return item.copy(key = key, hasSourceKey = true)
 }
 
@@ -87,6 +89,7 @@ internal data class StudyGroup(
     val extraImages: List<ListeningAsset> = emptyList(),
 ) {
     val images get() = listOfNotNull(image) + extraImages
+    val oceanSpeech get() = part <= 4 && source.startsWith(OCEAN_SOURCE_PREFIX)
 
     init {
         require(id.isNotBlank() && part in 1..7 && version.isNotBlank() && source.isNotBlank())
@@ -99,6 +102,31 @@ internal data class StudyGroup(
 internal data class StudyScore(val total: Int, val attempted: Int, val graded: Int, val correct: Int) {
     val wrong get() = graded - correct
     val ungraded get() = attempted - graded
+}
+
+internal fun studyPracticeGroups(groups: List<StudyGroup>, scored: Boolean): List<StudyGroup> =
+    groups.mapNotNull { group ->
+        val items = group.items.filter { (it.key != null) == scored }
+        when (items.size) {
+            0 -> null
+            group.items.size -> group
+            else -> group.copy(items = items)
+        }
+    }
+
+internal fun dailyStudyBatches(groups: List<StudyGroup>): List<List<StudyGroup>> = buildList {
+    var batch = mutableListOf<StudyGroup>()
+    var count = 0
+    for (group in groups) {
+        if (batch.isNotEmpty() && count + group.items.size > 15) {
+            add(batch)
+            batch = mutableListOf()
+            count = 0
+        }
+        batch.add(group)
+        count += group.items.size
+    }
+    if (batch.isNotEmpty()) add(batch)
 }
 
 internal data class StudyAttempt(
@@ -131,7 +159,7 @@ internal data class StudyAttempt(
 
     fun displayChoiceOrder(): List<Int> {
         val order = item.choices.indices.toMutableList()
-        if (mock == null && group.source.startsWith(OCEAN_SOURCE_PREFIX)) {
+        if (mock == null && group.source.startsWith(OCEAN_SOURCE_PREFIX) && group.part >= 3) {
             // SQLite snapshots retain source indices. Keep the display order stable for each saved attempt.
             val seed = MessageDigest.getInstance("SHA-256")
                 .digest("$id:${group.version}:${item.id}".toByteArray(Charsets.UTF_8))

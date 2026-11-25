@@ -56,6 +56,35 @@ class StudyAttemptTest {
         assertEquals(options.indices.toList(), attempt.copy(groups = listOf(group)).displayChoiceOrder())
     }
 
+    @Test fun speechWithLetteredOptionsKeepsTheRecordedChoiceOrder() {
+        val ocean = group.copy(source = "${OCEAN_SOURCE_PREFIX}fixture", part = 1)
+        for (id in 1L..10) {
+            assertEquals(options.indices.toList(), StudyAttempt(listOf(ocean), id = id).displayChoiceOrder())
+        }
+    }
+
+    @Test fun gradedAndUngradedPracticeKeepExistingIdsAndSeparateTheirKeys() {
+        val graded = studyPracticeGroups(listOf(group), scored = true).single()
+        val ungraded = studyPracticeGroups(listOf(group), scored = false).single()
+        assertEquals(group.id, graded.id)
+        assertEquals(listOf("q1", "q3"), graded.items.map { it.id })
+        assertEquals(listOf("q2"), ungraded.items.map { it.id })
+        for (item in graded.items) assertEquals(studyItemDigest(group, item), studyItemDigest(graded, item))
+        val practice = StudyAttempt(listOf(graded)).select(1).retainCurrentPracticeKeys(listOf(group))
+        assertEquals(1, practice.finish(1000).score().correct)
+        assertEquals(1, StudyAttempt(listOf(ungraded)).select(0).finish(1000).score().ungraded)
+    }
+
+    @Test fun dailyBatchesKeepCompleteGroupsAtTheBoundary() {
+        val groups = (1..7).map { num ->
+            group.copy(id = "group$num", items = group.items.map { it.copy(id = "group$num:${it.id}") })
+        }
+        val batches = dailyStudyBatches(groups)
+        assertEquals(listOf(5, 2), batches.map { it.size })
+        assertEquals(groups, batches.flatten())
+        assertTrue(batches.all { batch -> batch.sumOf { it.items.size } <= 15 })
+    }
+
     @Test fun suggestionUsesWeakestGradedPartOrLeastAttemptedAvailablePart() {
         assertEquals(3, recommendedPart(setOf(1, 3, 5), listOf(PartStats(1, 2, 1), PartStats(3, 4, 1))))
         assertEquals(3, recommendedPart(setOf(1, 3, 5), listOf(PartStats(1, 0, 0, 3))))
@@ -80,6 +109,7 @@ class StudyAttemptTest {
         assertEquals(2, eligible.key?.choice)
         assertFalse(eligible.key!!.batchAccepted)
         assertTrue(applyStudyAnswer(group, original, source, review.copy(batchAccepted = true)).key!!.batchAccepted)
+        assertTrue(applyStudyAnswer(group, original, source, review.copy(practiceOnly = true)).key!!.practiceOnly)
     }
 
     @Test fun imageOrderAndRevocationAffectNewAttemptsWithoutRescoringHistory() {

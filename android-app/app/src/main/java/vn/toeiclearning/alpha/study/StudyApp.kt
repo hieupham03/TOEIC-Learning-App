@@ -52,7 +52,7 @@ import kotlinx.coroutines.withContext
 import vn.toeiclearning.alpha.ui.AlphaTokens
 import vn.toeiclearning.alpha.ui.Notice
 
-private enum class StudyPage { HOME, SESSION, HISTORY, REVIEW, SETTINGS, MOCK }
+private enum class StudyPage { HOME, UNGRADED, SESSION, HISTORY, REVIEW, SETTINGS, MOCK }
 
 @Composable
 internal fun StudyApp() {
@@ -183,8 +183,15 @@ internal fun StudyApp() {
                     }
                 }
             } else when (page) {
-                StudyPage.HOME -> StudyHome(pack!!, dashboard!!, busy, ::continueAttempt, { start(it) }) {
-                    page = StudyPage.MOCK
+                StudyPage.HOME -> StudyHome(pack!!, dashboard!!, busy, ::continueAttempt,
+                    onStart = { start(it) },
+                    onUngraded = { page = StudyPage.UNGRADED },
+                    onMock = { page = StudyPage.MOCK })
+                StudyPage.UNGRADED -> StudyPageContent {
+                    StudyHeading("Luyện chưa chấm", onBack = { page = StudyPage.HOME })
+                    Text("Bài luyện vẫn lưu lựa chọn và lịch sử. Điểm số chỉ có ở bài đã xác minh đáp án.")
+                    StudyPartList(studyPracticeGroups(pack!!.groups, scored = false),
+                        dashboard!!.active == null && !busy, scored = false, onStart = { start(it) })
                 }
                 StudyPage.SESSION -> session?.let { attempt ->
                     StudySession(
@@ -299,15 +306,18 @@ internal fun StudyApp() {
 @Composable
 private fun StudyHome(
     pack: StudyPack, dashboard: StudyDashboard, busy: Boolean,
-    onResume: (Long) -> Unit, onStart: (List<StudyGroup>) -> Unit, onMock: () -> Unit,
+    onResume: (Long) -> Unit, onStart: (List<StudyGroup>) -> Unit, onUngraded: () -> Unit, onMock: () -> Unit,
 ) = StudyPageContent {
-    StudyHeading("Luyện tập")
+    val scored = remember(pack) { studyPracticeGroups(pack.groups, scored = true) }
+    val scoreable = scored.sumOf { it.items.size }
+    val ungraded = pack.groups.sumOf { it.items.size } - scoreable
+    StudyHeading("Luyện có chấm điểm")
     Text("Hôm nay ${dashboard.today}/${dashboard.goal} câu", style = MaterialTheme.typography.titleMedium)
-    val byPart = pack.groups.groupBy { it.part }
-    val suggestion = recommendedPart(byPart.keys, dashboard.stats)
+    val parts = scored.map { it.part }.toSet()
+    val suggestion = recommendedPart(parts, dashboard.stats)
     if (suggestion != null) {
-        val reason = if (dashboard.stats.any { it.part in byPart && it.wrong > 0 }) "tỷ lệ đúng thấp trong các Part đã chấm"
-        else "Part khả dụng có ít câu đã luyện nhất"
+        val reason = if (dashboard.stats.any { it.part in parts && it.wrong > 0 }) "tỷ lệ đúng thấp trong các Part đã chấm"
+        else "Part có chấm điểm đã luyện ít nhất"
         Text("Gợi ý Part $suggestion · $reason")
     }
     dashboard.active?.let {
@@ -315,31 +325,38 @@ private fun StudyHome(
         StudyButton("Tiếp tục $title · Câu ${it.item.number}", !busy, primary = true) { onResume(it.id) }
     }
     if (pack.unavailable || pack.skipped > 0) Notice("Một phần học liệu chưa mở được. Hãy kiểm tra gói nội dung.", warning = true)
-    (1..7).forEach { part ->
-        val groups = byPart[part].orEmpty()
-        val items = groups.flatMap { it.items }
+    Text("$scoreable câu có thể chấm điểm")
+    if (ungraded > 0) StudyButton("Luyện chưa chấm · $ungraded câu", !busy, onClick = onUngraded)
+    StudyPartList(scored, dashboard.active == null && !busy, scored = true, onStart = onStart)
+    StudyButton("Full Mock A / B", !busy, onClick = onMock)
+}
+
+@Composable
+private fun StudyPartList(
+    groups: List<StudyGroup>, enabled: Boolean, scored: Boolean, onStart: (List<StudyGroup>) -> Unit,
+) {
+    for ((part, partGroups) in groups.groupBy { it.part }.toSortedMap()) {
+        val count = partGroups.sumOf { it.items.size }
         Text("Part $part · ${if (part <= 4) "Listening" else "Reading"}", style = MaterialTheme.typography.titleMedium)
-        Text("${items.size} câu khả dụng · ${items.count { it.hasSourceKey }} có đáp án nguồn · ${items.count { it.key != null }} chấm được")
-        val editions = groups.groupBy { it.source to it.version }.values
+        Text("$count câu ${if (scored) "chấm được" else "chưa chấm"}")
+        val editions = partGroups.groupBy { it.source to it.version }.values
         val publisherCounts = editions.groupingBy { studyPublisher(it.first().source) }.eachCount()
-        if (editions.isEmpty()) StudyButton("Luyện Part $part", enabled = false) {}
         for (edition in editions) {
             val first = edition.first()
             val repeatedPublisher = (publisherCounts[studyPublisher(first.source)] ?: 0) > 1
             val label = when {
                 first.source == VOA_SUPPLEMENTAL_SOURCE -> "Luyện nghe bổ sung · VOA Learning English"
-                editions.size == 1 -> "Luyện Part $part"
+                !scored && editions.size == 1 -> "Luyện Part $part"
                 else -> "Luyện Part $part · ${studyEditionLabel(first, repeatedPublisher)}"
             }
-            val batches = if (edition.sumOf { it.items.size } <= 200) listOf(edition) else edition.chunked(40)
+            val batches = dailyStudyBatches(edition)
             batches.forEachIndexed { index, batch ->
                 val title = if (batches.size == 1) label else "$label · lượt ${index + 1}"
-                StudyButton(title, dashboard.active == null && !busy) { onStart(batch) }
+                StudyButton(title, enabled) { onStart(batch) }
             }
         }
         HorizontalDivider()
     }
-    StudyButton("Full Mock A / B", !busy, onClick = onMock)
 }
 
 internal fun studyPublisher(source: String): String =

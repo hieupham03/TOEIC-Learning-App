@@ -67,7 +67,7 @@ internal fun readStudyGroup(row: JSONObject, requireAnswerProof: Boolean = false
         val key = it.optJSONObject("key")?.takeUnless { requireAnswerProof }?.let { key ->
             require(key.getString("status") == "VERIFIED")
             StudyKey(key.getInt("choice"), key.getString("evidence"), key.optString("explanation").ifBlank { null },
-                key.optBoolean("batchAccepted"))
+                key.optBoolean("batchAccepted"), key.optBoolean("practiceOnly"))
         }
         StudyItem(it.getString("id"), it.getInt("number"), it.optString("prompt"), it.getJSONArray("choices").strings(),
             key, !requireAnswerProof && (it.optBoolean("hasSourceKey") || key != null))
@@ -89,7 +89,7 @@ internal fun readStudyGroup(row: JSONObject, requireAnswerProof: Boolean = false
         val review = itemRow.optJSONObject("key")?.takeIf { it.optString("status") == "VERIFIED" }?.let { approved ->
             approved.answerProof()?.let { proof -> StudyAnswerReview(proof, approved.opt("reviewer") as? String ?: "",
                 approved.opt("evidence") as? String ?: "", (approved.opt("explanation") as? String)?.takeIf(String::isNotBlank),
-                approved.optBoolean("batchAccepted")) }
+                approved.optBoolean("batchAccepted"), approved.optBoolean("practiceOnly")) }
         }
         applyStudyAnswer(group, item, sourceProof, review)
     })
@@ -120,7 +120,7 @@ internal fun writeStudyGroup(group: StudyGroup): JSONObject {
                 item.key?.let {
                     put("key", JSONObject().put("status", "VERIFIED").put("choice", it.choice)
                         .put("evidence", it.evidence).put("explanation", it.explanation)
-                        .put("batchAccepted", it.batchAccepted))
+                        .put("batchAccepted", it.batchAccepted).put("practiceOnly", it.practiceOnly))
                 }
             }
     }
