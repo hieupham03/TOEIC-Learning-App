@@ -3,6 +3,7 @@ package vn.toeiclearning.alpha.ui
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -183,19 +184,33 @@ internal fun PlaybackControls(playback: LocalListeningPlayer, study: Boolean = f
         style = MaterialTheme.typography.bodyLarge,
     )
     val error = state in setOf(PlaybackState.MISSING, PlaybackState.INVALID, PlaybackState.ERROR)
+    val label = when (state) {
+        PlaybackState.PLAYING -> "Tạm dừng"
+        PlaybackState.PAUSED -> "Tiếp tục phát"
+        PlaybackState.COMPLETED, PlaybackState.STOPPED -> "Phát lại"
+        else -> if (error) "Thử phát lại" else "Phát âm thanh"
+    }
+    if (study && state.active && state != PlaybackState.LOADING) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(playback::toggle, Modifier.weight(1f).heightIn(min = 48.dp)) { Text(label) }
+            OutlinedButton(
+                onClick = {
+                    playback.stop()
+                    playback.toggle()
+                },
+                modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+            ) { Text("Nghe lại từ đầu") }
+        }
+        return
+    }
     Button(
         enabled = state != PlaybackState.LOADING,
         onClick = playback::toggle,
         modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
     ) {
-        Text(when (state) {
-            PlaybackState.PLAYING -> "Tạm dừng"
-            PlaybackState.PAUSED -> "Tiếp tục phát"
-            PlaybackState.COMPLETED, PlaybackState.STOPPED -> "Phát lại"
-            else -> if (error) "Thử phát lại" else "Phát âm thanh"
-        })
+        Text(label)
     }
-    if (state.active) {
+    if (state.active && !study) {
         OutlinedButton(
             onClick = playback::stop,
             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),

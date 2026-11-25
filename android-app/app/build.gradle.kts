@@ -39,9 +39,11 @@ android {
     sourceSets.getByName("localPreview").assets.srcDir("../.tooling/fasttrack-handoff/part3-assets")
     val acceptedContent = "../.tooling/two-user-study/content-07/release-assets"
     val listeningContent = "../.tooling/two-user-study/content-08/release-assets"
+    val reviewedListening = "../.tooling/two-user-study/content-09/release-assets"
     val content06 = "../.tooling/two-user-study/content-06/assets"
     val studyAssets = providers.gradleProperty("studyAssetsDir").orElse(
         when {
+            file("$reviewedListening/study_pack/pack.json").isFile -> reviewedListening
             file("$listeningContent/study_pack/pack.json").isFile -> listeningContent
             file("$acceptedContent/study_pack/pack.json").isFile -> acceptedContent
             file("$content06/study_pack/pack.json").isFile -> content06
@@ -64,8 +66,8 @@ android {
 androidComponents {
     onVariants(selector().withBuildType("study")) { variant ->
         variant.outputs.forEach {
-            it.versionCode.set(13)
-            it.versionName.set("0.3.9-study")
+            it.versionCode.set(14)
+            it.versionName.set("0.3.10-study")
         }
     }
 }

@@ -34,6 +34,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -60,15 +61,16 @@ internal fun StudySession(
     busy: Boolean,
     marked: Boolean,
     clock: MockTime,
+    returnLabel: String,
     onChange: (StudyAttempt) -> Unit,
     onBookmark: () -> Unit,
-    onBack: () -> Unit,
+    onBack: (StudyAttempt) -> Unit,
 ) {
     val mock = attempt.mock
     if (attempt.complete && mock != null) {
-        BackHandler(onBack = onBack)
+        BackHandler { onBack(attempt) }
         StudyPageContent {
-            StudyHeading("Kết quả đề ${mock.form}", onBack)
+            StudyHeading("Kết quả đề ${mock.form}") { onBack(attempt) }
             Text("Phiên bản ${mock.version}")
             Text("${attempt.selections.size}/200 đã trả lời")
             if (attempt.interrupted) Notice("Bài bị gián đoạn. Lựa chọn đã lưu trên thiết bị.", warning = true)
@@ -79,7 +81,7 @@ internal fun StudySession(
                     Text("Part $part · ${score.correct}/${score.total} đúng · ${score.wrong} sai")
                 }
             }
-            StudyButton("Về luyện tập", onClick = onBack)
+            StudyButton(returnLabel) { onBack(attempt) }
         }
         return
     }
@@ -95,12 +97,13 @@ internal fun StudySession(
     }
     val hasPassage = group.part >= 6
     val choiceOrder = attempt.displayChoiceOrder()
-    var showPassage by remember(attempt.id, group.id) { mutableStateOf(hasPassage && !attempt.complete) }
-    var showResultPassage by remember(attempt.id, group.id) { mutableStateOf(false) }
+    var showPassage by rememberSaveable(attempt.id, group.id) { mutableStateOf(hasPassage && !attempt.complete) }
+    var showResultPassage by rememberSaveable(attempt.id, group.id) { mutableStateOf(false) }
+    val showQuestions = !showPassage || attempt.complete
     val questionStrip = rememberLazyListState()
-    LaunchedEffect(attempt.position, allowed.firstOrNull(), showPassage, attempt.complete) {
+    LaunchedEffect(attempt.position, allowed.firstOrNull(), showQuestions) {
         val index = allowed.indexOf(attempt.position)
-        if ((!showPassage || attempt.complete) && index >= 0 &&
+        if (showQuestions && index >= 0 &&
             questionStrip.layoutInfo.visibleItemsInfo.none { it.index == index }) {
             questionStrip.scrollToItem(index)
         }
@@ -111,8 +114,12 @@ internal fun StudySession(
     }
     val goBack = {
         if (!busy) {
-            if (hasPassage && !attempt.complete && !showPassage) showPassage = true
-            else onBack()
+            when {
+                attempt.complete && showResultPassage -> showResultPassage = false
+                hasPassage && !attempt.complete && !showPassage -> showPassage = true
+                hasPassage && !attempt.complete -> onBack(attempt.rememberReadingOffset(passageScroll.value))
+                else -> onBack(attempt)
+            }
         }
     }
     BackHandler(onBack = goBack)
@@ -143,8 +150,29 @@ internal fun StudySession(
             }
             if (hasPassage && !attempt.complete) {
                 StudyButton(if (showPassage) "Sang câu hỏi" else "Về đoạn văn", !busy, primary = showPassage) {
-                    if (showPassage) onChange(attempt.copy(readingOffsets = attempt.readingOffsets + (group.id to passageScroll.value)))
+                    if (showPassage) {
+                        val next = attempt.rememberReadingOffset(passageScroll.value)
+                        if (next != attempt) onChange(next)
+                    }
                     showPassage = !showPassage
+                }
+            }
+            if (showQuestions) {
+                LazyRow(state = questionStrip, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(allowed) { index ->
+                        val target = attempt.items[index]
+                        val answered = target.id in attempt.selections
+                        OutlinedButton(
+                            onClick = { if (index != attempt.position) onChange(attempt.move(index)) },
+                            enabled = !busy,
+                            modifier = Modifier.heightIn(min = 48.dp).semantics { selected = target.id == item.id },
+                        ) { Text("${target.number}${if (answered) " ✓" else ""}") }
+                    }
+                }
+            }
+            if (mock == null) {
+                key(group.id, group.version, attempt.complete) {
+                    group.audio?.let { PlaybackControls(rememberListeningPlayer(it), study = true) }
                 }
             }
             if (showPassage && !attempt.complete) {
@@ -163,17 +191,6 @@ internal fun StudySession(
                         Notice("${score.attempted}/${score.total} đã trả lời · ${score.total - score.attempted} bỏ trống")
                         Text(if (score.graded == 0) "Chưa có câu đã chấm bằng đáp án xác minh."
                         else "${score.correct} đúng · ${score.wrong} sai · ${score.ungraded} đã trả lời chưa chấm")
-                    }
-                    LazyRow(state = questionStrip, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(allowed) { index ->
-                            val target = attempt.items[index]
-                            val answered = target.id in attempt.selections
-                            OutlinedButton(
-                                onClick = { onChange(attempt.move(index)) },
-                                enabled = !busy,
-                                modifier = Modifier.heightIn(min = 48.dp).semantics { selected = target.id == item.id },
-                            ) { Text("${target.number}${if (answered) " ✓" else ""}") }
-                        }
                     }
                     if (attempt.complete) {
                         val answer = item.key
@@ -194,10 +211,8 @@ internal fun StudySession(
                         else -> "Câu này chưa có đáp án đã xác minh."
                     })
                     key(group.id, group.version) {
-                        group.audio?.let {
-                            if (mock == null) PlaybackControls(rememberListeningPlayer(it), study = true)
-                            else if (phase == MockPhase.LISTENING) MockAudio(attempt, it, busy, onChange)
-                        }
+                        if (mock != null && phase == MockPhase.LISTENING)
+                            group.audio?.let { MockAudio(attempt, it, busy, onChange) }
                     }
                     if (!hasPassage) StudyImages(group)
                     val audioOnly = group.oceanSpeech && group.part <= 2 && !attempt.complete
@@ -230,7 +245,7 @@ internal fun StudySession(
                     }
                 }
             }
-            if (!showPassage || attempt.complete) {
+            if (showQuestions) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton({ onChange(attempt.move(attempt.position - 1)) },
                         Modifier.weight(1f).heightIn(min = 48.dp), !busy && attempt.position - 1 in allowed) { Text("Câu trước") }
@@ -240,9 +255,9 @@ internal fun StudySession(
                     }
                 }
             }
-            val action = if (attempt.complete) "Về luyện tập" else if (mock != null) "Nộp đề" else "Kết thúc bài luyện"
+            val action = if (attempt.complete) returnLabel else if (mock != null) "Nộp đề" else "Kết thúc bài luyện"
             StudyButton(action, !busy, primary = true) {
-                if (attempt.complete) onBack() else confirmFinish = true
+                if (attempt.complete) onBack(attempt) else confirmFinish = true
             }
         }
     }

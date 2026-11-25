@@ -60,6 +60,7 @@ internal fun StudyApp() {
     val store = remember(context) { StudyStore(context) }
     val scope = rememberCoroutineScope()
     var page by remember { mutableStateOf(StudyPage.HOME) }
+    var returnFromSession by remember { mutableStateOf(StudyPage.HOME) }
     var pack by remember { mutableStateOf<StudyPack?>(null) }
     var dashboard by remember { mutableStateOf<StudyDashboard?>(null) }
     var session by remember { mutableStateOf<StudyAttempt?>(null) }
@@ -98,15 +99,19 @@ internal fun StudyApp() {
         if (goalInput.isBlank()) goalInput = it.goal.toString()
     }
 
-    fun start(groups: List<StudyGroup>, position: Int = 0) =
+    fun start(groups: List<StudyGroup>, position: Int = 0) {
+        val origin = page
         runLocal({ store.start(groups, position) to store.dashboard(day()) }) { (attempt, stats) ->
             session = attempt
             dashboard = stats
+            returnFromSession = origin
             page = StudyPage.SESSION
         }
+    }
 
     fun continueAttempt(id: Long) {
         val currentPack = pack
+        val origin = page
         runLocal({
             val previous = checkNotNull(store.attempt(id))
             val time = mockTime()
@@ -122,6 +127,8 @@ internal fun StudyApp() {
             session = saved
             dashboard = stats
             clock = mockTime()
+            returnFromSession = if (origin == StudyPage.HOME && saved.mock == null && saved.items.none { it.key != null })
+                StudyPage.UNGRADED else origin
             page = StudyPage.SESSION
         }
     }
@@ -151,7 +158,9 @@ internal fun StudyApp() {
         }
     }
 
-    BackHandler(enabled = page != StudyPage.HOME && page != StudyPage.SESSION) { refresh(StudyPage.HOME) }
+    BackHandler(enabled = page != StudyPage.HOME && page != StudyPage.SESSION) {
+        refresh(if (page == StudyPage.REVIEW) StudyPage.HISTORY else StudyPage.HOME)
+    }
 
     Scaffold(
         containerColor = AlphaTokens.Background,
@@ -198,6 +207,12 @@ internal fun StudyApp() {
                         attempt, busy,
                         marked = dashboard!!.reviews.any { it.item.id == attempt.item.id && it.marked },
                         clock = clock,
+                        returnLabel = when (returnFromSession) {
+                            StudyPage.HISTORY -> "Về tiến độ"
+                            StudyPage.REVIEW -> "Về ôn tập"
+                            StudyPage.UNGRADED -> "Về bài chưa chấm"
+                            else -> "Về luyện tập"
+                        },
                         onChange = { next ->
                             if (attempt.complete) session = next
                             else if (attempt.mock == null) saveAttempt(next)
@@ -215,10 +230,18 @@ internal fun StudyApp() {
                                 dashboard = it
                             }
                         },
-                        onBack = {
+                        onBack = { current ->
                             if (!attempt.complete && attempt.mock?.pendingAudio != null) {
                                 saveAttempt(attempt.finish(System.currentTimeMillis(), interrupted = true))
-                            } else refresh(StudyPage.HOME)
+                            } else if (!attempt.complete && attempt.mock == null && current != attempt) {
+                                runLocal({
+                                    store.save(current, day())
+                                    store.dashboard(day())
+                                }) {
+                                    dashboard = it
+                                    page = returnFromSession
+                                }
+                            } else refresh(returnFromSession)
                         },
                     )
                 }
@@ -276,6 +299,7 @@ internal fun StudyApp() {
                                     session = attempt
                                     dashboard = stats
                                     clock = time
+                                    returnFromSession = StudyPage.HOME
                                     page = StudyPage.SESSION
                                 }
                             }
@@ -314,15 +338,20 @@ private fun StudyHome(
     StudyHeading("Luyện có chấm điểm")
     Text("Hôm nay ${dashboard.today}/${dashboard.goal} câu", style = MaterialTheme.typography.titleMedium)
     val parts = scored.map { it.part }.toSet()
-    val suggestion = recommendedPart(parts, dashboard.stats)
-    if (suggestion != null) {
-        val reason = if (dashboard.stats.any { it.part in parts && it.wrong > 0 }) "tỷ lệ đúng thấp trong các Part đã chấm"
-        else "Part có chấm điểm đã luyện ít nhất"
-        Text("Gợi ý Part $suggestion · $reason")
-    }
-    dashboard.active?.let {
-        val title = it.mock?.let { run -> "đề ${run.form}" } ?: "Part ${it.group.part}"
-        StudyButton("Tiếp tục $title · Câu ${it.item.number}", !busy, primary = true) { onResume(it.id) }
+    val active = dashboard.active
+    if (active != null) {
+        val title = active.mock?.let { run -> "đề ${run.form}" } ?: "Part ${active.group.part}"
+        StudyButton("Tiếp tục $title · Câu ${active.item.number}", !busy, primary = true) { onResume(active.id) }
+    } else {
+        recommendedPart(parts, dashboard.stats)?.let { part ->
+            val partStats = dashboard.stats.firstOrNull { it.part == part }
+            val reason = if ((partStats?.wrong ?: 0) > 0) "độ chính xác thấp nhất trong các Part có câu sai"
+            else "ít câu đã chấm nhất"
+            val lesson = dailyStudyBatches(scored.filter { it.part == part }
+                .groupBy { it.source to it.version }.values.first()).first()
+            Text("Gợi ý Part $part · $reason")
+            StudyButton("Luyện Part $part theo gợi ý", !busy, onClick = { onStart(lesson) })
+        }
     }
     if (pack.unavailable || pack.skipped > 0) Notice("Một phần học liệu chưa mở được. Hãy kiểm tra gói nội dung.", warning = true)
     Text("$scoreable câu có thể chấm điểm")
@@ -382,13 +411,17 @@ private fun StudyHistoryPage(dashboard: StudyDashboard, busy: Boolean, onOpen: (
         dashboard.stats.filter { it.graded > 0 }.forEach { row ->
             Text("Part ${row.part} · ${row.correct} đúng, ${row.wrong} sai · ${row.correct * 100 / row.graded}%")
         }
+        val ungraded = dashboard.stats.sumOf { it.attempted - it.graded }
+        if (ungraded > 0) Text("$ungraded câu đã trả lời chưa chấm")
         Text("Lịch sử", style = MaterialTheme.typography.titleLarge)
         if (dashboard.history.isEmpty()) Text("Chưa có bài đã hoàn thành.")
         dashboard.history.forEach { item ->
             val date = Instant.ofEpochMilli(item.endedAt).atZone(ZoneId.systemDefault())
                 .format(DateTimeFormatter.ofPattern("dd/MM HH:mm"))
             val title = if (item.part == 0) "Full Mock" else "Part ${item.part}"
-            StudyButton("$title · $date · ${item.score.attempted}/${item.score.total} đã trả lời", !busy) { onOpen(item.id) }
+            val tally = if (item.score.graded > 0) "${item.score.correct}/${item.score.graded} đúng"
+            else if (item.score.ungraded > 0) "chưa chấm" else "chưa trả lời"
+            StudyButton("$title · $date · ${item.score.attempted}/${item.score.total} đã trả lời · $tally", !busy) { onOpen(item.id) }
         }
     }
 

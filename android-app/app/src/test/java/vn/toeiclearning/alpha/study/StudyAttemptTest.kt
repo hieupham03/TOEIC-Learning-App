@@ -85,10 +85,25 @@ class StudyAttemptTest {
         assertTrue(batches.all { batch -> batch.sumOf { it.items.size } <= 15 })
     }
 
-    @Test fun suggestionUsesWeakestGradedPartOrLeastAttemptedAvailablePart() {
+    @Test fun suggestionUsesWeakestGradedPartOrLeastGradedAvailablePart() {
         assertEquals(3, recommendedPart(setOf(1, 3, 5), listOf(PartStats(1, 2, 1), PartStats(3, 4, 1))))
-        assertEquals(3, recommendedPart(setOf(1, 3, 5), listOf(PartStats(1, 0, 0, 3))))
+        assertEquals(1, recommendedPart(setOf(1, 3, 5), listOf(PartStats(1, 0, 0, 30), PartStats(3, 1, 1))))
+        assertEquals(3, recommendedPart(setOf(1, 3), listOf(PartStats(1, 4, 4), PartStats(3, 2, 2, 20))))
         assertNull(recommendedPart(emptySet(), emptyList()))
+    }
+
+    @Test fun savingAPassageOffsetPreservesAnswersAndHistoricalState() {
+        val passage = group.copy(part = 7, passage = "Fixture passage.")
+        val open = StudyAttempt(listOf(passage)).select(1).move(1)
+        val saved = open.rememberReadingOffset(135)
+        assertEquals(mapOf(passage.id to 135), saved.readingOffsets)
+        assertEquals(open.selections, saved.selections)
+        assertEquals(open.position, saved.position)
+        assertEquals(saved, saved.rememberReadingOffset(135))
+        assertTrue(saved.rememberReadingOffset(0).readingOffsets.isEmpty())
+        val finished = saved.finish(1000)
+        assertEquals(finished, finished.rememberReadingOffset(20))
+        assertEquals(1, finished.score().correct)
     }
 
     @Test fun evidenceAndReviewMustMatchTheExactItemSnapshotBeforeScoring() {

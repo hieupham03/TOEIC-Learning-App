@@ -176,6 +176,11 @@ internal data class StudyAttempt(
 
     fun move(index: Int): StudyAttempt = copy(position = index.coerceIn(items.indices))
 
+    fun rememberReadingOffset(offset: Int): StudyAttempt =
+        if (complete || group.part < 6 || offset == (readingOffsets[group.id] ?: 0)) this
+        else if (offset == 0) copy(readingOffsets = readingOffsets - group.id)
+        else copy(readingOffsets = readingOffsets + (group.id to offset))
+
     fun finish(at: Long, interrupted: Boolean = false): StudyAttempt =
         if (complete) this else copy(finishedAt = at, interrupted = interrupted)
 
@@ -221,4 +226,4 @@ internal data class PartStats(val part: Int, val graded: Int, val correct: Int, 
 internal fun recommendedPart(available: Set<Int>, stats: List<PartStats>): Int? =
     stats.filter { it.part in available && it.graded > 0 && it.wrong > 0 }
         .minWithOrNull(compareBy<PartStats> { it.accuracy }.thenByDescending { it.wrong }.thenBy { it.part })?.part
-        ?: available.minWithOrNull(compareBy<Int> { part -> stats.firstOrNull { it.part == part }?.attempted ?: 0 }.thenBy { it })
+        ?: available.minWithOrNull(compareBy<Int> { part -> stats.firstOrNull { it.part == part }?.graded ?: 0 }.thenBy { it })
