@@ -1,3 +1,30 @@
+# LATEST PO OVERRIDE — RISK-BASED MINIMAL TESTING (2026-11-25)
+
+**Binding latest PO direction:** minimize testing time and tokens; do only checks proportional to actual failure risk. The previous all-variants/whole-suite/emulator-on-every-increment practice is superseded. The user has already completed a phone check; no repeating physical-device test for every build. This is a development-speed rule, not permission to fabricate QA evidence, score unverified answers, or destroy history.
+
+### Select the smallest meaningful verification for each change
+
+| Risk | Typical changes | Required check |
+|---|---|---|
+| **T0 — trivial/non-runtime** | Docs, wording, labels, colors, comments | Diff/format sanity only; **no build/unit/emulator** unless evidence shows runtime impact |
+| **T1 — localized low-risk** | Isolated Compose layout, simple navigation, noncritical visual adjustment | Relevant compile **or** narrow unit test; optional **single** emulator screenshot/smoke if UI change needs visual evidence; **not both by default**, no full regression |
+| **T2 — stateful/correctness** | Answer-key ingestion, scoring, option shuffle, wrong-answer history, SQLite persistence, offline audio, app upgrade, timing or mock locks | Focused tests of affected paths **plus one meaningful emulator/ADB scenario** when runtime behavior matters. For new content, source-key/item/group/media SHA mapping is mandatory; never auto-approve human QA. Verify any schema migration retains existing data |
+| **T3 — broad/high-stakes/release** | Large cross-module refactor, destructive migration risk, release candidate or cumulative quality gate | Broad test suite/Gradle + key emulator flows; one physical two-person acceptance **only at final private release**, or early only to diagnose a genuinely device-specific blocker |
+
+**Operational cost controls:**
+
+- **Do not run all three Gradle variants each iteration.** For a Study change run only the needed target, usually `./gradlew :app:assembleStudy :app:testStudyUnitTest` (Windows: `gradlew.bat`). Run other variants only if shared code/contracts affected; run `--rerun` only for a specific stale-test diagnosis.
+- **Do not run every Python ingestion test** for pure Kotlin/UI changes, nor Android build for Python-only changes if no APK is being shipped. Run focused ingestion tests on changed parser/source-key logic, and whole ingestion suite only for major intake work or release.
+- **Do not rerun all scope guards, Kotlin smoke or baseline SHA checks** on unrelated tiny edits. Preserve integrity protections; rerun relevant guards when their protected surface changes.
+- **Do not install/retest on phone per sprint.** Use MuMu+ADB on the user's Windows host if connected and relevant; else Android Emulator; if neither available say NOT RUN. Never claim access to a local device not accessible from current runner. Never `pm clear`, uninstall or reset SQLite by default.
+- **Run the shortest feedback loop:** edit -> related test/compile -> fix only failures -> one regression check if needed -> commit. Use Gradle incremental/cache; avoid repetitive full clean, `--rerun`, repeated emulator resets/boots.
+- **Log economy:** retain raw logs locally, report only changed features, check name, PASS/FAIL or NOT RUN, exceptions and current blockers. Include full stack trace only on failure; no long narratives, repeated matrices or huge test outputs. Do not claim full regression or two-phone QA when only targeted tests ran.
+- **Batch changes into meaningful user-facing increments.** Major content batch, score correctness or persisted state still require credible checks, but never demand exhaustive testing for simple UI/copy changes. Google Play remains deferred; no extra manual PO approval/test loops.
+
+**Priority:** finish usable daily TOEIC Listening & Reading quickly; meaningful scoreable content and learning UX ahead of synthetic-only frameworks or documents. All signed safety/data-integrity requirements remain binding.
+
+---
+
 # LATEST PO OVERRIDE — FIND *GRADABLE* TOEIC CONTENT FROM ALL ACCESSIBLE SOURCES (2026-11-22)
 
 **READ FIRST:** `docs/STAGE05_MULTI_SOURCE_GRADED_CONTENT_PRIORITY_V0.1.md`. The PO explicitly authorizes expanding source *discovery* beyond Zenlish, TheTOEICLab, Study4 and prioritizes complete TOEIC practice sets with an **actual associated answer key** so the two people can study and score accurately. All older source whitelists and batch plans are superseded only regarding sourcing breadth and technical priority. **Faust Academy has publicly indexed 7 Listening and 7 Reading practice papers with claimed separate answer-key PDFs; verify actual downloadable files/media and their match, do not assume.** ETS official sample PDF has a genuinely verified answer key page but is NOT a complete 200-question test. Try multiple attributable source publishers; switch candidates after blocks; no endless request loops. Keep original publisher/category distinct from official ETS.
